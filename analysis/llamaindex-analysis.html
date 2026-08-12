@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>SEC Insights — LlamaIndex 구조 분석</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --bg:#0b0e14; --panel:#131722; --panel2:#1a1f2e; --border:#2a3142;
+    --text:#e6e9f0; --muted:#8b93a7; --accent:#6ea8fe; --accent2:#7ee787;
+    --warn:#f2cc60; --pink:#f78fb3; --code-bg:#0d1117;
+  }
+  @media (prefers-color-scheme: light){
+    :root{
+      --bg:#f6f7fb; --panel:#ffffff; --panel2:#eef1f8; --border:#dde2ee;
+      --text:#1b2030; --muted:#5b6478; --accent:#2563eb; --accent2:#0f9d58;
+      --warn:#b3790a; --pink:#c2185b; --code-bg:#f1f3f9;
+    }
+  }
+  *{box-sizing:border-box}
+  body{
+    background:var(--bg); color:var(--text); font-family: -apple-system, "Segoe UI", "Pretendard", Roboto, sans-serif;
+    margin:0; padding:0 0 80px 0; line-height:1.65;
+  }
+  header{
+    padding:48px 24px 32px; max-width:1100px; margin:0 auto;
+  }
+  h1{ font-size:2rem; margin:0 0 8px; }
+  .subtitle{ color:var(--muted); font-size:1.05rem; }
+  main{ max-width:1100px; margin:0 auto; padding:0 24px; }
+  section{ margin:48px 0; }
+  h2{
+    font-size:1.4rem; border-left:4px solid var(--accent); padding-left:12px;
+    margin-bottom:16px;
+  }
+  h3{ font-size:1.1rem; color:var(--accent); margin-top:28px; }
+  p{ margin:12px 0; }
+  .card{
+    background:var(--panel); border:1px solid var(--border); border-radius:12px;
+    padding:20px 24px; margin:16px 0;
+  }
+  .grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:16px; }
+  code{
+    background:var(--code-bg); padding:2px 6px; border-radius:4px; font-size:0.9em;
+    font-family: "Fira Code", Consolas, monospace; color:var(--accent2);
+  }
+  pre{
+    background:var(--code-bg); border:1px solid var(--border); border-radius:10px;
+    padding:16px 18px; overflow-x:auto; font-size:0.85rem;
+  }
+  pre code{ background:none; padding:0; color:var(--text); }
+  table{ width:100%; border-collapse:collapse; margin:12px 0; font-size:0.92rem; }
+  th,td{ border:1px solid var(--border); padding:8px 12px; text-align:left; vertical-align:top; }
+  th{ background:var(--panel2); }
+  .tag{
+    display:inline-block; background:var(--panel2); border:1px solid var(--border);
+    border-radius:999px; padding:2px 10px; font-size:0.78rem; color:var(--accent);
+    margin-right:6px;
+  }
+  .badge-entry{ color:var(--accent2); border-color:var(--accent2); }
+  .badge-resp{ color:var(--pink); border-color:var(--pink); }
+  .note{
+    border-left:3px solid var(--warn); background:var(--panel2); padding:10px 16px;
+    border-radius:6px; font-size:0.92rem; color:var(--muted);
+  }
+  svg{ width:100%; height:auto; display:block; }
+  .diagram-wrap{
+    background:var(--panel); border:1px solid var(--border); border-radius:12px;
+    padding:16px; overflow-x:auto;
+  }
+  .toc{ display:flex; flex-wrap:wrap; gap:10px; margin:16px 0; }
+  .toc a{
+    color:var(--accent); text-decoration:none; font-size:0.88rem;
+    border:1px solid var(--border); padding:6px 12px; border-radius:8px;
+    background:var(--panel2);
+  }
+  .toc a:hover{ border-color:var(--accent); }
+  .step-num{
+    display:inline-flex; align-items:center; justify-content:center;
+    width:22px; height:22px; border-radius:50%; background:var(--accent);
+    color:#fff; font-size:0.75rem; font-weight:700; margin-right:8px;
+  }
+  footer{ text-align:center; color:var(--muted); font-size:0.85rem; margin-top:60px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🦙 SEC Insights — LlamaIndex 구조 분석</h1>
+  <p class="subtitle">이 저장소(<code>sec-insights</code>)는 LlamaIndex 공식 풀스택 레퍼런스 앱입니다. SEC(미국 증권거래위원회) 재무제표 PDF를 업로드하고, 이에 대해 채팅으로 질의응답하는 RAG(검색 증강 생성) + 에이전트 시스템입니다.</p>
+  <div class="toc">
+    <a href="#big-picture">① 전체 그림</a>
+    <a href="#entry">② 진입점</a>
+    <a href="#response">③ 응답점</a>
+    <a href="#internal">④ 내부 구조</a>
+    <a href="#syntax">⑤ 핵심 문법</a>
+    <a href="#concepts">⑥ LlamaIndex 개념 정리</a>
+    <a href="#files">⑦ 파일 지도</a>
+    <a href="llamaindex-deep-dive.html" style="color:var(--accent2)">→ 코드 정독 상세 버전</a>
+  </div>
+</header>
+
+<main>
+
+<section id="big-picture">
+  <h2>① 전체 그림 (Big Picture)</h2>
+  <p>
+    프론트엔드(Next.js)가 문서를 선택해 대화를 만들고, 백엔드(FastAPI)가 <b>LlamaIndex</b>를 사용해
+    각 PDF를 벡터 인덱스로 만든 뒤, 사용자의 질문에 대해 <b>에이전트(OpenAIAgent)</b>가 여러 <b>쿼리 엔진 도구(QueryEngineTool)</b>
+    중 필요한 것을 선택해 호출하고, 그 결과를 SSE(Server-Sent Events)로 스트리밍 응답합니다.
+  </p>
+  <div class="diagram-wrap">
+    <svg viewBox="0 0 1040 480" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6 Z" fill="var(--muted)"/>
+        </marker>
+      </defs>
+      <style>
+        .box{ fill:var(--panel2); stroke:var(--border); stroke-width:1.5; rx:10; }
+        .boxlabel{ fill:var(--text); font-size:13px; font-family:inherit; }
+        .sub{ fill:var(--muted); font-size:11px; }
+        .flow{ stroke:var(--accent); stroke-width:2; fill:none; marker-end:url(#arrow); }
+        .flow2{ stroke:var(--pink); stroke-width:2; fill:none; marker-end:url(#arrow); stroke-dasharray:4 3; }
+      </style>
+
+      <!-- Frontend -->
+      <rect class="box" x="20" y="30" width="200" height="70"/>
+      <text class="boxlabel" x="35" y="58">🖥️ Frontend (Next.js)</text>
+      <text class="sub" x="35" y="78">pages/conversation/[id].tsx</text>
+
+      <!-- Backend API -->
+      <rect class="box" x="300" y="30" width="220" height="70"/>
+      <text class="boxlabel" x="315" y="58">⚡ FastAPI Endpoint</text>
+      <text class="sub" x="315" y="78">/api/conversation/{id}/message</text>
+
+      <!-- messaging.py -->
+      <rect class="box" x="600" y="30" width="220" height="70"/>
+      <text class="boxlabel" x="615" y="58">📨 handle_chat_message()</text>
+      <text class="sub" x="615" y="78">app/chat/messaging.py</text>
+
+      <!-- get_chat_engine -->
+      <rect class="box" x="600" y="150" width="220" height="70"/>
+      <text class="boxlabel" x="615" y="178">🧠 get_chat_engine()</text>
+      <text class="sub" x="615" y="198">app/chat/engine.py</text>
+
+      <!-- OpenAIAgent -->
+      <rect class="box" x="300" y="150" width="220" height="70"/>
+      <text class="boxlabel" x="315" y="178">🤖 OpenAIAgent</text>
+      <text class="sub" x="315" y="198">function-calling ReAct-style agent</text>
+
+      <!-- SubQuestionQueryEngine x2 -->
+      <rect class="box" x="40" y="270" width="230" height="70"/>
+      <text class="boxlabel" x="55" y="298">📊 SubQuestionQueryEngine</text>
+      <text class="sub" x="55" y="318">qualitative (정성) — PDF 벡터 검색</text>
+
+      <rect class="box" x="300" y="270" width="230" height="70"/>
+      <text class="boxlabel" x="315" y="298">📈 SubQuestionQueryEngine</text>
+      <text class="sub" x="315" y="318">quantitative (정량) — Polygon.io API</text>
+
+      <!-- VectorStoreIndex -->
+      <rect class="box" x="40" y="380" width="230" height="70"/>
+      <text class="boxlabel" x="55" y="408">🗂️ VectorStoreIndex (문서별)</text>
+      <text class="sub" x="55" y="428">PGVectorStore ← Postgres+pgvector</text>
+
+      <!-- Polygon tool -->
+      <rect class="box" x="300" y="380" width="230" height="70"/>
+      <text class="boxlabel" x="315" y="408">🔧 FunctionTool</text>
+      <text class="sub" x="315" y="428">polygon.io 재무 API 호출</text>
+
+      <!-- SSE stream back -->
+      <rect class="box" x="600" y="380" width="220" height="70"/>
+      <text class="boxlabel" x="615" y="408">📡 SSE Stream 응답</text>
+      <text class="sub" x="615" y="428">EventSourceResponse → 프론트</text>
+
+      <!-- arrows -->
+      <path class="flow" d="M220,65 H300"/>
+      <path class="flow" d="M520,65 H600"/>
+      <path class="flow" d="M710,100 V150"/>
+      <path class="flow" d="M600,185 H520"/>
+      <path class="flow" d="M410,220 V270"/>
+      <path class="flow" d="M155,340 V380"/>
+      <path class="flow" d="M410,340 V380"/>
+      <path class="flow2" d="M270,415 H300"/>
+      <path class="flow2" d="M530,300 Q700,300 710,380"/>
+      <path class="flow2" d="M710,150 Q900,220 710,380"/>
+      <path class="flow2" d="M710,450 Q820,450 820,100" />
+    </svg>
+  </div>
+  <p class="note">
+    실선(파란색): 요청이 아래로 내려가는 경로(질문→엔진 구성→도구 실행). 점선(분홍색): 도구 실행 결과가 다시 위로 올라가 스트리밍 응답으로 합쳐지는 경로입니다.
+  </p>
+</section>
+
+<section id="entry">
+  <h2>② 진입점 (Entry Points)</h2>
+  <div class="grid">
+    <div class="card">
+      <span class="tag badge-entry">진입점 1</span>
+      <h3 style="margin-top:8px">프로세스 시작</h3>
+      <p><code>backend/app/main.py</code>의 <code>start()</code> 함수가 <code>poetry run start</code>로 실행됩니다.</p>
+      <ul>
+        <li>DB 연결 대기 → alembic 마이그레이션 체크</li>
+        <li><code>_setup_llama_index_settings()</code> 호출 → 전역 <code>Settings</code>(LLM, 임베딩 모델, 노드 파서) 설정</li>
+        <li><code>get_vector_store_singleton()</code>으로 pgvector 스토어 초기화</li>
+        <li><code>uvicorn.run("app.main:app", ...)</code>로 FastAPI 서버 기동</li>
+      </ul>
+    </div>
+    <div class="card">
+      <span class="tag badge-entry">진입점 2</span>
+      <h3 style="margin-top:8px">API 요청 (채팅)</h3>
+      <p><code>GET /api/conversation/{id}/message?user_message=...</code></p>
+      <p>파일: <code>backend/app/api/endpoints/conversation.py</code> → <code>message_conversation()</code></p>
+      <p>사용자가 프론트엔드에서 메시지를 보내면 이 SSE 엔드포인트가 실제 LlamaIndex 파이프라인을 트리거하는 <b>진짜 진입점</b>입니다.</p>
+    </div>
+    <div class="card">
+      <span class="tag badge-entry">진입점 3</span>
+      <h3 style="margin-top:8px">인덱스 구축 (오프라인 배치)</h3>
+      <p><code>backend/scripts/seed_storage_context.py</code>, <code>seed_db.py</code></p>
+      <p>DB에 등록된 각 PDF 문서를 읽어 <code>VectorStoreIndex.from_documents()</code>로 인덱싱하고 S3/StorageContext에 영속화하는 배치 스크립트. 앱 기동 전에 미리 실행해두는 오프라인 인덱싱 경로입니다.</p>
+    </div>
+  </div>
+</section>
+
+<section id="response">
+  <h2>③ 응답점 (Response Points)</h2>
+  <div class="grid">
+    <div class="card">
+      <span class="tag badge-resp">응답점 1</span>
+      <h3 style="margin-top:8px">LLM 토큰 스트림</h3>
+      <p><code>app/chat/messaging.py</code> → <code>chat_engine.astream_chat(message)</code></p>
+      <p><code>StreamingAgentChatResponse.async_response_gen()</code>를 <code>async for</code>로 순회하며 토큰이 생성되는 즉시 누적하여 <code>send_chan</code>(메모리 채널)으로 보냅니다.</p>
+    </div>
+    <div class="card">
+      <span class="tag badge-resp">응답점 2</span>
+      <h3 style="margin-top:8px">중간 과정 이벤트</h3>
+      <p><code>ChatCallbackHandler(BaseCallbackHandler)</code> — LlamaIndex의 콜백 시스템이 서브 질문 생성, 도구 호출 시작/종료 같은 이벤트를 가로채 <code>StreamedMessageSubProcess</code>로 변환해 함께 스트리밍합니다 (프론트에서 "생각 중..." UI로 표시).</p>
+    </div>
+    <div class="card">
+      <span class="tag badge-resp">응답점 3</span>
+      <h3 style="margin-top:8px">HTTP 응답</h3>
+      <p><code>conversation.py</code>의 <code>message_conversation()</code>이 최종적으로 <code>EventSourceResponse(event_publisher())</code>를 반환 — FastAPI가 SSE로 프론트엔드에 전송합니다. 완료 후 DB에 최종 Message/MessageSubProcess 저장.</p>
+    </div>
+  </div>
+</section>
+
+<section id="internal">
+  <h2>④ 내부 구조 — 요청 1건의 생애주기</h2>
+  <div class="diagram-wrap">
+    <svg viewBox="0 0 1000 720" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arrow2" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6 Z" fill="var(--accent)"/>
+        </marker>
+      </defs>
+      <style>
+        .n{ fill:var(--panel); stroke:var(--border); stroke-width:1.5; }
+        .nl{ fill:var(--text); font-size:13px; }
+        .ns{ fill:var(--muted); font-size:11px; }
+        .l{ stroke:var(--accent); stroke-width:2; fill:none; marker-end:url(#arrow2); }
+        .num{ fill:var(--accent); font-size:13px; font-weight:700; }
+      </style>
+
+      <!-- vertical timeline steps -->
+      <!-- step1 -->
+      <text class="num" x="10" y="35">1</text>
+      <rect class="n" x="40" y="15" width="920" height="55" rx="8"/>
+      <text class="nl" x="60" y="38">사용자가 프론트엔드 채팅창에 질문 입력 → GET /message SSE 연결 시작</text>
+      <text class="ns" x="60" y="56">conversation.py: message_conversation()</text>
+
+      <text class="num" x="10" y="110">2</text>
+      <rect class="n" x="40" y="90" width="920" height="55" rx="8"/>
+      <text class="nl" x="60" y="113">handle_chat_message() 호출 — ChatCallbackHandler(send_chan) 생성 후 get_chat_engine()에 전달</text>
+      <text class="ns" x="60" y="131">messaging.py</text>
+
+      <text class="num" x="10" y="185">3</text>
+      <rect class="n" x="40" y="165" width="920" height="70" rx="8"/>
+      <text class="nl" x="60" y="188">대화에 첨부된 각 문서 → build_doc_id_to_index_map()으로 VectorStoreIndex 로드(캐시) 또는 신규 생성</text>
+      <text class="ns" x="60" y="206">StorageContext(pgvector) → S3에 캐시된 인덱스가 있으면 재사용, 없으면 PDFReader + SentenceSplitter로 새로 청크·임베딩</text>
+
+      <text class="num" x="10" y="270">4</text>
+      <rect class="n" x="40" y="250" width="920" height="55" rx="8"/>
+      <text class="nl" x="60" y="273">문서별 VectorStoreIndex → QueryEngineTool 로 래핑 (이름=문서ID, 설명=문서 메타데이터 기반 설명문)</text>
+      <text class="ns" x="60" y="291">engine.py: index_to_query_engine(), build_description_for_document()</text>
+
+      <text class="num" x="10" y="345">5</text>
+      <rect class="n" x="40" y="325" width="440" height="65" rx="8"/>
+      <text class="nl" x="55" y="348">정성 질문용 SubQuestionQueryEngine</text>
+      <text class="ns" x="55" y="366">여러 문서 QueryEngineTool을 모아 "부분 질문"으로 분해 후 병렬 조회</text>
+
+      <rect class="n" x="500" y="325" width="460" height="65" rx="8"/>
+      <text class="nl" x="515" y="348">정량 질문용 SubQuestionQueryEngine</text>
+      <text class="ns" x="515" y="366">각 문서를 위한 OpenAIAgent(FunctionTool=polygon.io API) → QueryEngineTool</text>
+
+      <text class="num" x="10" y="425">6</text>
+      <rect class="n" x="40" y="405" width="920" height="55" rx="8"/>
+      <text class="nl" x="60" y="428">두 엔진을 top_level_sub_tools(QueryEngineTool 2개)로 감싸 최상위 OpenAIAgent 생성</text>
+      <text class="ns" x="60" y="446">system_prompt=SYSTEM_MESSAGE, chat_history 주입, max_function_calls=3</text>
+
+      <text class="num" x="10" y="500">7</text>
+      <rect class="n" x="40" y="480" width="920" height="55" rx="8"/>
+      <text class="nl" x="60" y="503">chat_engine.astream_chat(question) — 에이전트가 필요한 도구를 스스로 선택(function calling)해 반복 호출</text>
+      <text class="ns" x="60" y="521">OpenAI function-calling 루프: LLM이 "이 질문엔 quantitative_question_engine이 필요해" 판단 → 실행 → 결과를 컨텍스트에 추가 → 최종 답 생성</text>
+
+      <text class="num" x="10" y="575">8</text>
+      <rect class="n" x="40" y="555" width="920" height="55" rx="8"/>
+      <text class="nl" x="60" y="578">콜백 이벤트(SUB_QUESTION, FUNCTION_CALL 등) + LLM 토큰이 실시간으로 send_chan → SSE로 흘러나감</text>
+      <text class="ns" x="60" y="596">ChatCallbackHandler.async_on_event() / async_response_gen()</text>
+
+      <text class="num" x="10" y="650">9</text>
+      <rect class="n" x="40" y="630" width="920" height="55" rx="8"/>
+      <text class="nl" x="60" y="653">스트림 종료 → 최종 Message/MessageSubProcess를 DB에 커밋, 마지막 완성 메시지를 한번 더 전송</text>
+      <text class="ns" x="60" y="671">conversation.py event_publisher()</text>
+
+      <path class="l" d="M500,70 V90"/>
+      <path class="l" d="M500,145 V165"/>
+      <path class="l" d="M500,235 V250"/>
+      <path class="l" d="M500,305 V325"/>
+      <path class="l" d="M500,390 V405"/>
+      <path class="l" d="M500,460 V480"/>
+      <path class="l" d="M500,535 V555"/>
+      <path class="l" d="M500,610 V630"/>
+    </svg>
+  </div>
+</section>
+
+<section id="syntax">
+  <h2>⑤ 핵심 문법 — 코드로 보는 LlamaIndex</h2>
+
+  <h3>1) 전역 설정 (Settings) — LLM / 임베딩 / 청크 전략을 한 곳에서 관리</h3>
+  <pre><code>from llama_index.core import Settings
+from llama_index.llms.openai import OpenAI
+from llama_index.embeddings.openai import OpenAIEmbedding
+from llama_index.core.node_parser import SentenceSplitter
+
+Settings.llm = OpenAI(model="gpt-4", api_key=...)
+Settings.embed_model = OpenAIEmbedding(...)
+Settings.node_parser = SentenceSplitter(chunk_size=512, chunk_overlap=10)</code></pre>
+  <p><code>Settings</code>는 과거 <code>ServiceContext</code>를 대체한 전역 싱글턴으로, 이후 만들어지는 모든 인덱스/쿼리엔진이 별도 지정 없이 이 LLM·임베딩·청크 설정을 상속받습니다. (<code>llama_index_settings.py</code>)</p>
+
+  <h3>2) 문서 로딩 → 인덱스 생성</h3>
+  <pre><code>reader = PDFReader()
+docs = reader.load_data(path, extra_info={"db_document_id": doc_id})
+
+index = VectorStoreIndex.from_documents(
+    docs,
+    storage_context=storage_context,   # 어디에(벡터DB) 저장할지
+    callback_manager=callback_manager, # 이벤트 훅
+)
+index.set_index_id(str(doc.id))</code></pre>
+  <p><code>VectorStoreIndex.from_documents()</code>가 내부적으로: (a) <code>node_parser</code>로 문서를 청크(Node)로 분할 → (b) 각 청크를 <code>embed_model</code>로 임베딩 → (c) <code>StorageContext</code>에 연결된 <code>VectorStore</code>(여기선 Postgres pgvector)에 저장. 3단계를 한 줄로 캡슐화합니다.</p>
+
+  <h3>3) StorageContext — "무엇을 어디에 저장할지"의 배선판</h3>
+  <pre><code>storage_context = StorageContext.from_defaults(
+    persist_dir=persist_dir,   # 인덱스 메타(docstore/index_store) 저장 위치 (S3)
+    vector_store=vector_store, # 실제 벡터는 Postgres pgvector에 저장
+    fs=s3_fs,                  # fsspec 파일시스템 추상화
+)</code></pre>
+  <p>docstore(원문 노드), index_store(인덱스 메타), vector_store(임베딩 벡터) 세 저장소를 하나로 묶는 객체입니다. 이 프로젝트는 벡터는 Postgres, 나머지 메타는 S3에 분리 저장하는 하이브리드 구성을 씁니다.</p>
+
+  <h3>4) 문서 하나 = 쿼리 엔진 하나 = 도구(Tool) 하나</h3>
+  <pre><code>query_engine = index.as_query_engine(
+    similarity_top_k=3,
+    filters=MetadataFilters(filters=[ExactMatchFilter(key="db_document_id", value=doc_id)]),
+)
+
+tool = QueryEngineTool(
+    query_engine=query_engine,
+    metadata=ToolMetadata(name=doc_id, description="이 문서가 무엇에 관한 것인지"),
+)</code></pre>
+  <p>LlamaIndex의 <b>Tool 추상화</b>가 핵심입니다: 무엇이든(쿼리 엔진, 함수, 다른 에이전트) <code>description</code>이 붙은 도구로 감싸면, 상위 에이전트/엔진이 "이 도구는 이런 걸 할 수 있다"를 읽고 스스로 선택해 호출할 수 있습니다.</p>
+
+  <h3>5) SubQuestionQueryEngine — 여러 도구를 하나의 질문 오케스트레이터로</h3>
+  <pre><code>engine = SubQuestionQueryEngine.from_defaults(
+    query_engine_tools=vector_query_engine_tools,  # 문서별 도구 리스트
+    response_synthesizer=response_synth,
+    use_async=True,
+)</code></pre>
+  <p>사용자의 복합 질문(예: "Uber와 Lyft의 2021년 매출을 비교해줘")을 LLM이 <b>서브 질문들</b>로 분해("Uber 2021 매출은?", "Lyft 2021 매출은?")한 뒤, 각각 알맞은 도구에 병렬로(<code>use_async=True</code>) 질의하고 결과를 다시 종합합니다.</p>
+
+  <h3>6) Response Synthesizer — 검색된 청크 → 최종 답변 문장으로 합성</h3>
+  <pre><code>synth = get_response_synthesizer(
+    callback_manager=callback_manager,
+    refine_template=refine_prompt,   # 기존 답을 새 컨텍스트로 "정련"하는 프롬프트
+    text_qa_template=qa_prompt,      # 최초 컨텍스트로 답을 만드는 프롬프트
+)</code></pre>
+  <p>기본 전략은 "refine": 검색된 청크를 순서대로 하나씩 LLM에 넣어 답을 점진적으로 개선(refine)합니다. 이 프로젝트는 SEC 문서 특화 QA/Refine 프롬프트를 커스텀 템플릿으로 교체했습니다. (<code>qa_response_synth.py</code>)</p>
+
+  <h3>7) FunctionTool — 임의의 파이썬 함수를 에이전트 도구로</h3>
+  <pre><code>tool = FunctionTool.from_defaults(
+    fn=sync_placeholder,
+    async_fn=extract_data_from_sec_document,  # polygon.io API 호출
+    description="이 SEC 문서의 재무 데이터를 가져온다",
+)</code></pre>
+  <p>벡터 검색이 아니라 <b>외부 API 호출</b>도 도구가 될 수 있음을 보여주는 부분입니다. RAG(검색)와 Tool-use(행동)를 같은 인터페이스로 섞어 쓰는 것이 LlamaIndex 에이전트의 핵심 아이디어입니다.</p>
+
+  <h3>8) 최상위 에이전트 — 도구들의 도구(계층적 구성)</h3>
+  <pre><code>top_level_sub_tools = [
+    QueryEngineTool(query_engine=qualitative_question_engine, ...),
+    QueryEngineTool(query_engine=quantitative_question_engine, ...),
+]
+
+chat_engine = OpenAIAgent.from_tools(
+    tools=top_level_sub_tools,
+    llm=chat_llm,
+    chat_history=chat_history,
+    system_prompt=SYSTEM_MESSAGE.format(...),
+    max_function_calls=3,
+)
+
+response = await chat_engine.astream_chat(question)
+async for token in response.async_response_gen():
+    ...</code></pre>
+  <p><b>SubQuestionQueryEngine 자체가 다시 QueryEngineTool로 감싸져</b> 최상위 <code>OpenAIAgent</code>의 도구가 됩니다. 즉 "도구의 도구"로 계층을 이루는 구조 — 이게 이 리포지토리에서 가장 배울 가치가 있는 패턴입니다.</p>
+
+  <h3>9) 콜백 매니저 — 파이프라인 내부를 관찰하는 훅</h3>
+  <pre><code>class ChatCallbackHandler(BaseCallbackHandler):
+    def on_event_start(self, event_type, payload, event_id, **kw): ...
+    def on_event_end(self, event_type, payload, event_id, **kw): ...
+
+callback_manager = CallbackManager([callback_handler])</code></pre>
+  <p>인덱스 생성, 쿼리, 서브 질문 분해, LLM 호출 등 LlamaIndex 내부 모든 단계가 이벤트를 발생시키며, <code>CallbackManager</code>에 등록된 핸들러가 이를 가로챌 수 있습니다. 이 프로젝트는 이걸 이용해 "지금 무슨 서브 질문을 하고 있는지"를 프론트엔드에 실시간으로 보여줍니다.</p>
+</section>
+
+<section id="concepts">
+  <h2>⑥ LlamaIndex 개념 한눈에 정리</h2>
+  <table>
+    <tr><th>개념</th><th>역할</th><th>이 프로젝트에서의 사용처</th></tr>
+    <tr><td><code>Settings</code></td><td>전역 LLM/임베딩/청크 설정 싱글턴</td><td><code>llama_index_settings.py</code></td></tr>
+    <tr><td><code>Document</code> / <code>Node</code></td><td>원본 문서 / 청크 단위</td><td>PDFReader가 만든 Document → SentenceSplitter가 Node로 분할</td></tr>
+    <tr><td><code>StorageContext</code></td><td>docstore/index_store/vector_store 배선</td><td>S3(메타) + Postgres pgvector(벡터)</td></tr>
+    <tr><td><code>VectorStoreIndex</code></td><td>임베딩 기반 검색 인덱스</td><td>SEC 문서 1개당 인덱스 1개</td></tr>
+    <tr><td><code>QueryEngine</code></td><td>질문→검색→답변 생성 파이프라인</td><td><code>index.as_query_engine()</code></td></tr>
+    <tr><td><code>ResponseSynthesizer</code></td><td>검색 결과를 최종 텍스트로 합성</td><td>커스텀 QA/Refine 프롬프트</td></tr>
+    <tr><td><code>Tool</code> (QueryEngineTool / FunctionTool)</td><td>에이전트가 호출 가능한 능력 단위</td><td>문서별 검색 도구, polygon.io API 도구</td></tr>
+    <tr><td><code>SubQuestionQueryEngine</code></td><td>복합 질문을 분해해 여러 도구에 라우팅</td><td>정성/정량 질문 엔진 2개</td></tr>
+    <tr><td><code>Agent</code> (OpenAIAgent)</td><td>도구를 스스로 선택·반복 호출하는 LLM 루프</td><td>최상위 chat_engine, 문서별 재무 API 에이전트</td></tr>
+    <tr><td><code>CallbackManager</code></td><td>내부 이벤트 관찰/후킹</td><td>SSE로 "생각 중" 서브프로세스 스트리밍</td></tr>
+    <tr><td><code>ChatMessage</code> / 대화 이력</td><td>멀티턴 대화 컨텍스트</td><td>DB에 저장된 과거 메시지를 에이전트에 주입</td></tr>
+  </table>
+</section>
+
+<section id="files">
+  <h2>⑦ 파일 지도 (학습 순서 추천)</h2>
+  <div class="card">
+    <ol>
+      <li><b><code>backend/app/llama_index_settings.py</code></b> — 가장 먼저: 전역 설정이 어떻게 잡히는지</li>
+      <li><b><code>backend/app/chat/constants.py</code></b> — 시스템 프롬프트, 청크 크기 상수</li>
+      <li><b><code>backend/app/chat/pg_vector.py</code></b> — 벡터 저장소(pgvector) 커넥션</li>
+      <li><b><code>backend/app/chat/engine.py</code></b> — 핵심. 인덱스 로딩부터 에이전트 조립까지 전체 파이프라인</li>
+      <li><b><code>backend/app/chat/qa_response_synth.py</code></b> — 답변 합성 프롬프트 커스터마이징</li>
+      <li><b><code>backend/app/chat/tools.py</code></b> — 외부 API를 도구로 감싸는 법</li>
+      <li><b><code>backend/app/chat/messaging.py</code></b> — 콜백 → SSE 브릿지</li>
+      <li><b><code>backend/app/api/endpoints/conversation.py</code></b> — 실제 HTTP/SSE 진입점·응답점</li>
+      <li><b><code>backend/scripts/seed_storage_context.py</code></b> — 오프라인 인덱스 구축 배치 스크립트</li>
+    </ol>
+  </div>
+  <p class="note">
+    💡 학습 팁: <code>engine.py</code>의 <code>get_chat_engine()</code> 함수 하나가 이 앱의 "LlamaIndex 사용법 교과서"입니다. 인덱스 로딩 → Tool 래핑 → SubQuestionQueryEngine → 최상위 Agent, 이 4단계 패턴만 이해하면 다른 LlamaIndex 앱도 같은 틀로 읽을 수 있습니다.
+  </p>
+</section>
+
+<footer>SEC Insights 저장소 분석 · analysis/llamaindex-analysis.html</footer>
+</main>
+</body>
+</html>

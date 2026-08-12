@@ -1,0 +1,17 @@
+# sec-insights 백엔드(backend/pyproject.toml)와 동일한 버전대를 맞춰서
+# "왜 여기선 다르게 동작하지?" 같은 버전 문제를 피합니다.
+llama-index-core==0.12.23
+llama-index-readers-file==0.4.6
+llama-index-embeddings-openai==0.3.1
+llama-index-llms-openai==0.3.25
+llama-index-agent-openai==0.4.6
+llama-index-question-gen-openai==0.3.0
+openai==1.66.2
+python-dotenv==1.0.1
+# pypdf는 버전을 고정하지 않음 — llama-index-readers-file 0.4.6이 요구하는
+# pypdf>=5.1.0,<6.0.0 범위에 pip가 알아서 맞추도록 둡니다.
+
+# Stage 9 (선택)에서만 필요. sec-insights 백엔드(backend/pyproject.toml)와 맞춘 버전.
+fastapi==0.115.11
+uvicorn==0.22.0
+sse-starlette==1.6.1

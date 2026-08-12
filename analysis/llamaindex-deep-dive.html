@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>SEC Insights — LlamaIndex 코드 정독 (학습 순서)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --bg:#0b0e14; --panel:#131722; --panel2:#1a1f2e; --border:#2a3142;
+    --text:#e6e9f0; --muted:#8b93a7; --accent:#6ea8fe; --accent2:#7ee787;
+    --warn:#f2cc60; --pink:#f78fb3; --code-bg:#0d1117;
+  }
+  @media (prefers-color-scheme: light){
+    :root{
+      --bg:#f6f7fb; --panel:#ffffff; --panel2:#eef1f8; --border:#dde2ee;
+      --text:#1b2030; --muted:#5b6478; --accent:#2563eb; --accent2:#0f9d58;
+      --warn:#b3790a; --pink:#c2185b; --code-bg:#f1f3f9;
+    }
+  }
+  *{box-sizing:border-box}
+  body{
+    background:var(--bg); color:var(--text); font-family: -apple-system, "Segoe UI", "Pretendard", Roboto, sans-serif;
+    margin:0; padding:0 0 100px; line-height:1.7;
+  }
+  header{ padding:44px 24px 24px; max-width:980px; margin:0 auto; }
+  h1{ font-size:1.85rem; margin:0 0 8px; }
+  .subtitle{ color:var(--muted); }
+  main{ max-width:980px; margin:0 auto; padding:0 24px; }
+  .toc{
+    display:flex; flex-direction:column; gap:6px; background:var(--panel);
+    border:1px solid var(--border); border-radius:12px; padding:16px 20px; margin:20px 0 40px;
+  }
+  .toc a{ color:var(--accent); text-decoration:none; font-size:0.92rem; }
+  .toc a:hover{ text-decoration:underline; }
+  .toc .idx{ color:var(--muted); margin-right:6px; }
+
+  .filesec{
+    margin:64px 0; padding-top:8px; border-top:2px solid var(--border);
+  }
+  .filehead{
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:6px;
+  }
+  .stepnum{
+    display:inline-flex; align-items:center; justify-content:center;
+    min-width:28px; height:28px; border-radius:8px; background:var(--accent);
+    color:#0b0e14; font-weight:800; font-size:0.9rem; padding:0 8px;
+  }
+  .filehead h2{ font-size:1.25rem; margin:0; }
+  .filepath{
+    font-family: Consolas, monospace; font-size:0.85rem; color:var(--muted);
+    background:var(--panel2); padding:3px 10px; border-radius:6px; border:1px solid var(--border);
+  }
+  .role{ color:var(--muted); margin:8px 0 20px; font-size:0.96rem; }
+
+  .chunk{
+    background:var(--panel); border:1px solid var(--border); border-radius:12px;
+    margin:18px 0; overflow:hidden;
+  }
+  .chunk .lineinfo{
+    font-size:0.75rem; color:var(--muted); padding:8px 16px 0;
+  }
+  pre{ margin:0; padding:14px 18px; overflow-x:auto; background:var(--code-bg); font-size:0.85rem; }
+  code{ font-family: "Fira Code", Consolas, monospace; }
+  .kw{ color:#c792ea; } .str{ color:#c3e88d; } .cm{ color:var(--muted); font-style:italic; }
+  .explain{
+    padding:14px 20px 18px; font-size:0.93rem; border-top:1px dashed var(--border);
+  }
+  .explain b{ color:var(--accent); }
+  .explain .term{
+    display:inline-block; background:var(--panel2); border:1px solid var(--border);
+    border-radius:5px; padding:0 6px; font-family:Consolas,monospace; font-size:0.85em; color:var(--accent2);
+  }
+  ul.points{ margin:8px 0; padding-left:20px; }
+  ul.points li{ margin:4px 0; }
+  .note{
+    border-left:3px solid var(--warn); background:var(--panel2); padding:10px 16px;
+    border-radius:6px; font-size:0.9rem; color:var(--muted); margin:16px 0;
+  }
+  .key{
+    border-left:3px solid var(--accent2); background:var(--panel2); padding:10px 16px;
+    border-radius:6px; font-size:0.9rem; margin:16px 0;
+  }
+  footer{ text-align:center; color:var(--muted); font-size:0.85rem; margin-top:60px; }
+  a.back{ color:var(--accent); font-size:0.85rem; text-decoration:none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🦙 SEC Insights — LlamaIndex 코드 정독</h1>
+  <p class="subtitle">
+    이전 개요 문서(<code>llamaindex-analysis.html</code>)가 너무 추상적이었다는 피드백을 반영해,
+    이번엔 <b>학습 순서대로 파일을 열고, 코드를 그대로 보면서, 블록 단위로 한 줄씩 무슨 뜻인지</b> 설명합니다.
+    각 섹션은 실제 소스 코드를 그대로 인용하고 바로 아래에 해설을 붙였습니다.
+  </p>
+  <div class="toc">
+    <a href="#f1"><span class="idx">1</span>llama_index_settings.py — 전역 설정</a>
+    <a href="#f2"><span class="idx">2</span>chat/constants.py — 프롬프트·상수</a>
+    <a href="#f3"><span class="idx">3</span>chat/pg_vector.py — 벡터 저장소 연결</a>
+    <a href="#f4"><span class="idx">4</span>chat/engine.py — 핵심 파이프라인</a>
+    <a href="#f5"><span class="idx">5</span>chat/qa_response_synth.py — 답변 합성 프롬프트</a>
+    <a href="#f6"><span class="idx">6</span>chat/tools.py — 외부 API를 도구로</a>
+    <a href="#f7"><span class="idx">7</span>chat/messaging.py — 콜백→SSE 브릿지</a>
+    <a href="#f8"><span class="idx">8</span>api/endpoints/conversation.py — HTTP 진입점</a>
+    <a href="#f9"><span class="idx">9</span>scripts/seed_storage_context.py — 인덱스 배치 구축</a>
+  </div>
+</header>
+
+<main>
+
+<!-- ============ FILE 1 ============ -->
+<section class="filesec" id="f1">
+  <div class="filehead">
+    <span class="stepnum">1</span>
+    <h2>전역 설정 (Settings)</h2>
+    <span class="filepath">backend/app/llama_index_settings.py</span>
+  </div>
+  <p class="role">가장 먼저 읽어야 하는 이유: 이 파일이 <b>"어떤 LLM, 어떤 임베딩 모델, 어떤 청크 크기를 쓸지"</b>를 앱 전체에 딱 한 번 세팅합니다. 이후 나오는 모든 인덱스/쿼리엔진 코드는 이 설정을 몰래 상속받아 씁니다.</p>
+
+  <div class="chunk">
+    <pre><code>from llama_index.core import Settings
+from llama_index.core.settings import _Settings
+from llama_index.llms.openai import OpenAI
+from llama_index.embeddings.openai import OpenAIEmbedding, OpenAIEmbeddingMode, OpenAIEmbeddingModelType
+from app.core.config import settings
+from llama_index.core.node_parser import SentenceSplitter
+
+from app.chat.constants import (
+    NODE_PARSER_CHUNK_OVERLAP,
+    NODE_PARSER_CHUNK_SIZE,
+)</code></pre>
+    <div class="explain">
+      <b>import 정리:</b>
+      <ul class="points">
+        <li><span class="term">Settings</span> — LlamaIndex의 전역 설정 객체. 예전 버전에서는 <code>ServiceContext</code>라는 걸 매번 함수마다 넘겨줘야 했는데, 지금은 이 <code>Settings</code>에 한 번만 값을 넣어두면 어디서든 자동으로 읽힙니다. (파이썬의 전역 싱글턴 패턴)</li>
+        <li><span class="term">OpenAI</span> (llms.openai) — LLM 래퍼 클래스. "질문에 답을 생성하는" 모델(예: gpt-4)을 감싸는 객체.</li>
+        <li><span class="term">OpenAIEmbedding</span> — 텍스트를 벡터(숫자 배열)로 바꾸는 임베딩 모델 래퍼. LLM과는 별개 모델입니다 (LLM=답변 생성용, Embedding=검색용).</li>
+        <li><span class="term">SentenceSplitter</span> — 긴 문서를 문장 단위를 존중하면서 일정 크기로 잘라주는 "청크 분할기(Node Parser)".</li>
+        <li><code>app.core.config.settings</code>는 <b>이 프로젝트 자체의</b> 환경변수 설정(우리 앱의 config)이고, 위의 <code>llama_index.core.Settings</code>는 <b>LlamaIndex 라이브러리의</b> 전역 설정입니다. 이름이 겹쳐서 헷갈리기 쉬우니 주의하세요.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="chunk">
+    <pre><code>def _setup_llama_index_settings() -> _Settings:
+    Settings.llm = OpenAI(
+        model=settings.OPENAI_CHAT_LLM_NAME,
+        api_key=settings.OPENAI_API_KEY
+    )
+    Settings.embed_model = OpenAIEmbedding(
+        mode=OpenAIEmbeddingMode.SIMILARITY_MODE,
+        model_type=OpenAIEmbeddingModelType.TEXT_EMBED_3_SMALL,
+        api_key=settings.OPENAI_API_KEY,
+    )
+    Settings.node_parser = SentenceSplitter(
+        chunk_size=NODE_PARSER_CHUNK_SIZE,
+        chunk_overlap=NODE_PARSER_CHUNK_OVERLAP,
+    )
+    return Settings</code></pre>
+    <div class="explain">
+      <ul class="points">
+        <li><code>Settings.llm = OpenAI(...)</code> — "앞으로 답변 생성이 필요할 때는 이 OpenAI 모델을 써라"고 전역에 등록. 이후 코드 어디서도 <code>llm=...</code>을 명시적으로 넘기지 않으면 자동으로 이 값이 쓰입니다.</li>
+        <li><code>Settings.embed_model = OpenAIEmbedding(...)</code> — 문서를 벡터DB에 저장할 때, 그리고 질문을 벡터로 바꿔 검색할 때 사용할 임베딩 모델. <code>TEXT_EMBED_3_SMALL</code>은 OpenAI의 저비용 임베딩 모델 이름.</li>
+        <li><code>Settings.node_parser = SentenceSplitter(chunk_size=512, chunk_overlap=10)</code> — PDF를 512 토큰(대략 단어 300~400개) 단위로, 청크 사이 10 토큰씩 겹치게 잘라서 검색 정확도를 높입니다. (겹치게 자르는 이유: 문장이 청크 경계에서 잘려 의미가 끊기는 걸 방지)</li>
+        <li>이 함수는 <code>main.py</code>의 <code>start()</code> 함수 안에서 서버가 뜨기 <b>직전에 딱 한 번</b> 호출됩니다. 그 이후로는 이 파일을 다시 볼 일이 없습니다 — "설정하고 잊기" 패턴.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="key"><b>핵심 포인트:</b> LlamaIndex는 "이번 함수 호출에서만 쓸 LLM"을 매번 인자로 넘기는 대신, <code>Settings</code>라는 전역 변수에 한 번 박아두고 모든 인덱스/쿼리엔진이 암묵적으로 참조하게 만드는 구조입니다. 나중에 코드에서 <code>llm=</code> 인자가 안 보여도 당황하지 마세요 — <code>Settings.llm</code>이 쓰이고 있는 겁니다.</div>
+</section>
+
+<!-- ============ FILE 2 ============ -->
+<section class="filesec" id="f2">
+  <div class="filehead">
+    <span class="stepnum">2</span>
+    <h2>프롬프트 · 상수</h2>
+    <span class="filepath">backend/app/chat/constants.py</span>
+  </div>
+  <p class="role">이 파일엔 로직이 없습니다. 전부 문자열/숫자 상수입니다. 하지만 <b>시스템 프롬프트</b>를 미리 읽어두면 이후 에이전트가 "왜 이렇게 행동하는지" 이해하기 쉬워집니다.</p>
+
+  <div class="chunk">
+    <pre><code>DB_DOC_ID_KEY = "db_document_id"
+
+SYSTEM_MESSAGE = """
+You are an expert financial analyst that always answers questions with the most relevant information using the tools at your disposal.
+...
+The tools at your disposal have access to the following SEC documents that the user has selected to discuss with you:
+{doc_titles}
+
+The current date is: {curr_date}
+""".strip()
+
+NODE_PARSER_CHUNK_SIZE = 512
+NODE_PARSER_CHUNK_OVERLAP = 10</code></pre>
+    <div class="explain">
+      <ul class="points">
+        <li><code>DB_DOC_ID_KEY = "db_document_id"</code> — 나중에 <b>메타데이터 필터링</b>에 쓰이는 키 이름입니다. 모든 문서 청크에 "이 청크는 어느 문서 소속인지" 표시하기 위해 이 키를 씁니다. (파일 4 <code>engine.py</code>에서 다시 등장)</li>
+        <li><code>SYSTEM_MESSAGE</code> — 최상위 에이전트(OpenAIAgent)에게 주입되는 시스템 프롬프트 템플릿. <code>{doc_titles}</code>와 <code>{curr_date}</code>는 나중에 <code>.format()</code>으로 실제 값이 채워지는 자리표시자(placeholder)입니다.</li>
+        <li>이 프롬프트가 시키는 행동 규칙을 요약하면: "재무 관련 질문은 반드시 도구를 써서 답해라", "도구가 못 찾아도 최대한 관련 정보를 알려줘라", "재무와 무관한 질문은 정중히 거절해라" — 즉 <b>에이전트의 성격과 제약을 텍스트로 설계</b>한 것입니다.</li>
+        <li><code>NODE_PARSER_CHUNK_SIZE/OVERLAP</code> — 파일 1(<code>llama_index_settings.py</code>)에서 실제로 <code>SentenceSplitter</code>에 주입되는 값이 여기서 정의됩니다.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="note">💡 프롬프트 엔지니어링 관점에서 이 파일을 보는 게 좋습니다: LlamaIndex 자체는 프롬프트를 강제하지 않고, "이 위치에 시스템 프롬프트를 넣을 수 있는 매개변수"만 제공합니다. 실제 품질은 이런 프로젝트별 프롬프트 설계에 달려 있습니다.</div>
+</section>
+
+<!-- ============ FILE 3 ============ -->
+<section class="filesec" id="f3">
+  <div class="filehead">
+    <span class="stepnum">3</span>
+    <h2>벡터 저장소 연결 (pgvector)</h2>
+    <span class="filepath">backend/app/chat/pg_vector.py</span>
+  </div>
+  <p class="role">임베딩 벡터를 실제로 어디에 저장하는지 담당하는 파일. LlamaIndex의 <code>VectorStore</code> 추상 인터페이스를 Postgres(pgvector 확장)로 구현한 <code>PGVectorStore</code>를 커스터마이징합니다.</p>
+
+  <div class="chunk">
+    <pre><code>from llama_index.core.vector_stores.types import VectorStore
+from llama_index.vector_stores.postgres import PGVectorStore
+...
+
+class CustomPGVectorStore(PGVectorStore):
+    """
+    Custom PGVectorStore that uses the same connection pool as the FastAPI app.
+    """
+
+    def _connect(self) -> None:
+        self._engine = create_engine(self.connection_string)
+        self._session = sessionmaker(self._engine)
+
+        # Use our existing app engine and session so we can use the same connection pool
+        self._async_engine = app_engine
+        self._async_session = AppSessionLocal</code></pre>
+    <div class="explain">
+      <ul class="points">
+        <li><span class="term">VectorStore</span> — LlamaIndex가 정의한 <b>인터페이스(추상 클래스)</b>입니다. "임베딩을 저장하고, 유사도 검색을 할 수 있으면" 무엇이든 VectorStore가 될 수 있습니다 (Pinecone, Chroma, Postgres, ...). 이 프로젝트는 <code>PGVectorStore</code>(공식 구현체)를 상속해서 커스터마이징합니다.</li>
+        <li><code>class CustomPGVectorStore(PGVectorStore)</code> — 왜 상속해서 커스텀했나? 기본 구현은 자기가 알아서 새 DB 커넥션 풀을 만드는데, 이 FastAPI 앱은 <b>이미 SQLAlchemy 커넥션 풀(app_engine)을 갖고 있으므로</b> 벡터 저장소도 그 풀을 재사용하도록 <code>_connect()</code>를 오버라이드한 것입니다. (커넥션 풀 중복 생성 방지 = 리소스 절약)</li>
+        <li>즉 이 클래스 자체는 LlamaIndex 개념이라기보다 <b>"기존 FastAPI 인프라와 LlamaIndex를 접붙이는 접착제 코드"</b>입니다.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="chunk">
+    <pre><code>    async def run_setup(self) -> None:
+        global did_run_setup
+        if did_run_setup:
+            return
+        self._initialize()
+        async with self._async_session() as session:
+            async with session.begin():
+                statement = sqlalchemy.text("CREATE EXTENSION IF NOT EXISTS vector")
+                await session.execute(statement)
+                await session.commit()
+
+        async with self._async_session() as session:
+            async with session.begin():
+                conn = await session.connection()
+                await conn.run_sync(self._base.metadata.create_all)
+        did_run_setup = True</code></pre>
+    <div class="explain">
+      <ul class="points">
+        <li><code>CREATE EXTENSION IF NOT EXISTS vector</code> — Postgres에 <b>pgvector 확장</b>을 활성화하는 SQL. 이게 있어야 Postgres가 벡터 컬럼 타입과 코사인/L2 유사도 연산을 지원합니다.</li>
+        <li><code>self._base.metadata.create_all</code> — SQLAlchemy ORM 모델(임베딩을 저장할 테이블 스키마)을 실제 테이블로 생성. 즉 "임베딩 테이블이 없으면 만들어라"는 마이그레이션 겸 초기화 로직입니다.</li>
+        <li><code>did_run_setup</code> 플래그로 앱 실행 중 한 번만 실행되게 막습니다. 이 함수는 <code>main.py</code>의 <code>lifespan()</code>에서 서버 시작 시 호출됩니다.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="chunk">
+    <pre><code>async def get_vector_store_singleton() -> VectorStore:
+    global singleton_instance
+    if singleton_instance is not None:
+        return singleton_instance
+    url = make_url(settings.DATABASE_URL)
+    singleton_instance = CustomPGVectorStore.from_params(
+        url.host, url.port or 5432, url.database, url.username, url.password,
+        settings.VECTOR_STORE_TABLE_NAME,
+    )
+    return singleton_instance</code></pre>
+    <div class="explain">
+      <ul class="points">
+        <li><b>싱글턴 패턴</b> — 앱 전체에서 <code>VectorStore</code> 인스턴스를 딱 하나만 만들어 재사용합니다. 이 함수는 이후 <code>engine.py</code>, <code>seed_storage_context.py</code> 등 여러 곳에서 반복 호출되지만, 실제 인스턴스 생성은 최초 1회뿐입니다.</li>
+        <li><code>settings.VECTOR_STORE_TABLE_NAME</code> — 임베딩이 저장될 Postgres 테이블 이름을 앱 설정값으로부터 가져옵니다.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FILE 4 ============ -->
+<section class="filesec" id="f4">
+  <div class="filehead">
+    <span class="stepnum">4</span>
+    <h2>핵심 파이프라인 (인덱스 로딩 → 도구 조립 → 에이전트 생성)</h2>
+    <span class="filepath">backend/app/chat/engine.py</span>
+  </div>
+  <p class="role">이 프로젝트에서 <b>가장 중요한 파일</b>입니다. "PDF → 인덱스 → 도구 → 에이전트"로 이어지는 전체 파이프라인이 이 파일 하나에 다 들어 있습니다. 순서대로 함수 단위로 뜯어봅니다.</p>
+
+  <h3 style="margin-top:32px">4-1. 문서를 내려받아 LlamaIndex Document로 변환</h3>
+  <div class="chunk">
+    <pre><code>def fetch_and_read_document(
+    document: DocumentSchema,
+) -> List[LlamaIndexDocument]:
+    with TemporaryDirectory() as temp_dir:
+        temp_file_path = Path(temp_dir) / f"{str(document.id)}.pdf"
+        with open(temp_file_path, "wb") as temp_file:
+            with requests.get(document.url, stream=True) as r:
+                r.raise_for_status()
+                for chunk in r.iter_content(chunk_size=8192):
+                    temp_file.write(chunk)
+            temp_file.seek(0)
+            reader = PDFReader()
+            return reader.load_data(
+                temp_file_path, extra_info={DB_DOC_ID_KEY: str(document.id)}
+            )</code></pre>
+    <div class="explain">
+      <ul class="points">
+        <li>우리 DB에 저장된 <code>document.url</code>(S3에 있는 PDF 링크)에서 파일을 스트리밍으로 내려받아 임시 디렉터리에 저장합니다.</li>
+        <li><span class="term">PDFReader</span> — LlamaIndex의 <b>Reader(로더)</b>입니다. PDF 파일 경로를 넣으면 페이지별로 텍스트를 뽑아 <code>Document</code> 객체 리스트로 반환합니다. Reader는 LlamaIndex 생태계에서 "무엇이든 Document로 바꿔주는 어댑터" 역할(PDF, Notion, Slack, 웹페이지 등 수백 종류가 있습니다).</li>
+        <li><code>extra_info={DB_DOC_ID_KEY: str(document.id)}</code> — 이게 핵심입니다. 생성되는 모든 <code>Document</code>(나중엔 쪼개진 Node에도 상속됨)에 <b>메타데이터</b>로 "이 문서는 db_document_id=xxx 다"라는 꼬리표를 붙입니다. 이 꼬리표 덕분에 나중에 "이 문서에서만 검색해라"는 필터링이 가능해집니다 (4-4 참고).</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3 style="margin-top:32px">4-2. 문서 하나 → 쿼리 엔진 하나 (메타데이터 필터 포함)</h3>
+  <div class="chunk">
+    <pre><code>def index_to_query_engine(doc_id: str, index: VectorStoreIndex) -> BaseQueryEngine:
+    filters = MetadataFilters(
+        filters=[ExactMatchFilter(key=DB_DOC_ID_KEY, value=doc_id)]
+    )
+    kwargs = {"similarity_top_k": 3, "filters": filters}
+    return index.as_query_engine(**kwargs)</code></pre>
+    <div class="explain">
+      <ul class="points">
+        <li>주의: 이 프로젝트는 <b>모든 문서의 청크를 같은 Postgres 테이블에 함께 저장</b>합니다 (문서별로 테이블을 나누지 않음). 그래서 검색할 때 "이 문서의 청크만" 걸러내야 하는데, 그게 바로 <code>MetadataFilters</code> + <code>ExactMatchFilter(key=DB_DOC_ID_KEY, value=doc_id)</code>입니다.</li>
+        <li><code>index.as_query_engine(similarity_top_k=3, filters=filters)</code> — <code>VectorStoreIndex</code>를 <b>QueryEngine</b>(질문→검색→답변 파이프라인)으로 변환하는 한 줄. <code>similarity_top_k=3</code>은 "가장 유사한 청크 3개만 가져와서 답변에 사용해라"는 뜻.</li>
+        <li>즉 "문서 1개 = 논리적으로 격리된 쿼리 엔진 1개"라는 착시를 메타데이터 필터로 구현한 것입니다. 실제 벡터는 다 같은 테이블에 있습니다.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3 style="margin-top:32px">4-3. StorageContext 캐싱</h3>
+  <div class="chunk">
+    <pre><code>@cached(
+    TTLCache(maxsize=10, ttl=timedelta(minutes=5).total_seconds()),
+    key=lambda *args, **kwargs: "global_storage_context",
+)
+def get_storage_context(
+    persist_dir: str, vector_store: VectorStore, fs: Optional[AsyncFileSystem] = None
+) -> StorageContext:
+    logger.info("Creating new storage context.")
+    return StorageContext.from_defaults(
+        persist_dir=persist_dir, vector_store=vector_store, fs=fs
+    )</code></pre>
+    <div class="explain">
+      <ul class="points">
+        <li><code>@cached(TTLCache(...))</code> — 파이썬 <code>cachetools</code> 라이브러리의 데코레이터로, 이 함수 결과를 5분간 메모리에 캐싱합니다. <code>StorageContext.from_defaults(persist_dir=..., fs=...)</code>가 S3에서 인덱스 메타 파일들을 읽어오는 I/O 작업이라 비싸기 때문에, 매 요청마다 새로 만들지 않고 재사용합니다.</li>
+        <li><code>StorageContext.from_defaults(persist_dir, vector_store, fs)</code> — S3(<code>fs</code>로 추상화됨)의 <code>persist_dir</code> 경로에서 기존에 저장된 docstore/index_store 메타데이터를 읽어와 <code>StorageContext</code>를 복원합니다. 처음 실행이라 S3에 아무것도 없으면 <code>FileNotFoundError</code>가 나며, 이는 호출부(4-4)에서 잡아서 새로 만듭니다.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3 style="margin-top:32px">4-4. 문서 목록 → {문서ID: 인덱스} 맵 만들기 (가장 복잡한 함수)</h3>
+  <div class="chunk">
+    <pre><code>async def build_doc_id_to_index_map(
+    callback_manager: CallbackManager,
+    documents: List[DocumentSchema],
+    fs: Optional[AsyncFileSystem] = None,
+) -> Dict[str, VectorStoreIndex]:
+    persist_dir = f"{settings.S3_BUCKET_NAME}"
+    vector_store = await get_vector_store_singleton()
+    try:
+        try:
+            storage_context = get_storage_context(persist_dir, vector_store, fs=fs)
+        except FileNotFoundError:
+            storage_context = StorageContext.from_defaults(vector_store=vector_store, fs=fs)
+            storage_context.persist(persist_dir=persist_dir, fs=fs)
+        index_ids = [str(doc.id) for doc in documents]
+        indices = load_indices_from_storage(
+            storage_context, index_ids=index_ids, callback_manager=callback_manager,
+        )
+        doc_id_to_index = dict(zip(index_ids, indices))
+    except ValueError:
+        # 인덱스가 아직 한 번도 만들어진 적 없는 경우 (신규 문서)
+        storage_context = StorageContext.from_defaults(
+            persist_dir=persist_dir, vector_store=vector_store, fs=fs
+        )
+        doc_id_to_index = {}
+        for doc in documents:
+            llama_index_docs = fetch_and_read_document(doc)
+            storage_context.docstore.add_documents(llama_index_docs)
+            index = VectorStoreIndex.from_documents(
+                llama_index_docs,
+                storage_context=storage_context,
+                callback_manager=callback_manager,
+            )
+            index.set_index_id(str(doc.id))
+            index.storage_context.persist(persist_dir=persist_dir, fs=fs)
+            doc_id_to_index[str(doc.id)] = index
+    return doc_id_to_index</code></pre>
+    <div class="explain">
+      <ul class="points">
+        <li>큰 그림: <b>"이미 인덱싱된 문서면 불러오고(load), 처음 보는 문서면 새로 만든다(build)"</b>는 로드-or-생성(load-or-build) 패턴입니다.</li>
+        <li><b>try 블록 (로드 경로):</b> <code>load_indices_from_storage(storage_context, index_ids=[...])</code> — 이전에 <code>index.set_index_id(doc_id)</code>로 저장해둔 인덱스를, 같은 ID로 다시 불러옵니다. 문서 ID를 인덱스 ID로 그대로 쓰는 설계라 "이 문서 ID의 인덱스를 줘"라는 조회가 자연스럽게 됩니다.</li>
+        <li><b>except ValueError (신규 생성 경로):</b> 저장소에 해당 index_id가 없으면 <code>load_indices_from_storage</code>가 <code>ValueError</code>를 던집니다. 이때 진짜로 처음부터 인덱스를 만듭니다:
+          <ol style="margin:6px 0 0 18px">
+            <li><code>fetch_and_read_document(doc)</code>로 PDF → Document 리스트 (4-1)</li>
+            <li><code>storage_context.docstore.add_documents(...)</code> — 원문 청크 원본을 docstore(메타 저장소)에 등록</li>
+            <li><code>VectorStoreIndex.from_documents(docs, storage_context=...)</code> — 여기서 실제로 <b>청크 분할(SentenceSplitter) → 임베딩(OpenAIEmbedding) → pgvector 저장</b>이 한 번에 일어남 (Settings에 등록된 값들이 암묵적으로 쓰임 — 파일 1 참고!)</li>
+            <li><code>index.set_index_id(str(doc.id))</code> — "이 인덱스의 이름표는 문서ID다"라고 지정</li>
+            <li><code>index.storage_context.persist(persist_dir, fs)</code> — 인덱스 메타를 S3에 저장해서 다음 요청부턴 로드 경로를 타게 함</li>
+          </ol>
+        </li>
+        <li>이 함수는 대화(conversation)에 첨부된 문서들에 대해 매번 호출되지만, 이미 인덱싱된 문서라면 로드만 하면 되므로 (그리고 <code>get_storage_context</code>가 5분 캐싱되므로) 실제로는 꽤 빠릅니다.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3 style="margin-top:32px">4-5. 문서 도구 목록 만들기 + 서브 질문 엔진 2개 조립</h3>
+  <div class="chunk">
+    <pre><code>vector_query_engine_tools = [
+    QueryEngineTool(
+        query_engine=index_to_query_engine(doc_id, index),
+        metadata=ToolMetadata(
+            name=doc_id,
+            description=build_description_for_document(id_to_doc[doc_id]),
+        ),
+    )
+    for doc_id, index in doc_id_to_index.items()
+]
+
+response_synth = get_custom_response_synth(callback_manager, conversation.documents)
+
+qualitative_question_engine = SubQuestionQueryEngine.from_defaults(
+    query_engine_tools=vector_query_engine_tools,
+    response_synthesizer=response_synth,
+    verbose=settings.VERBOSE,
+    use_async=True,
+)</code></pre>
+    <div class="explain">
+      <ul class="points">
+        <li>선택된 문서마다 (4-2)에서 만든 쿼리 엔진을 <code>QueryEngineTool</code>로 포장합니다. <code>name=doc_id</code>, <code>description</code>은 <code>build_description_for_document()</code>가 "Uber의 2021년 10-K 재무보고서" 같은 자연어 설명을 만들어줍니다 — 이 description을 나중에 LLM이 읽고 "이 도구를 쓸지 말지" 판단합니다.</li>
+        <li><code>SubQuestionQueryEngine.from_defaults(query_engine_tools=[...], response_synthesizer=..., use_async=True)</code> — 문서별 도구 여러 개를 <b>하나의 상위 쿼리 엔진</b>으로 묶습니다. 내부적으로 LLM이 사용자의 질문을 "부분 질문들"로 쪼갠 뒤, 각 부분 질문을 어떤 문서 도구에 물어볼지 정하고, <code>use_async=True</code>라 여러 문서에 동시에(병렬로) 질의합니다.</li>
+        <li>이걸 "정성적 질문 엔진(qualitative)"이라고 이름붙인 이유: 벡터 검색은 텍스트 의미 기반 검색이라 "리스크 요인이 뭐야?" 같은 서술형 질문에 강합니다.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="chunk">
+    <pre><code>api_query_engine_tools = [
+    get_api_query_engine_tool(doc, callback_manager)
+    for doc in conversation.documents
+    if DocumentMetadataKeysEnum.SEC_DOCUMENT in doc.metadata_map
+]
+
+quantitative_question_engine = SubQuestionQueryEngine.from_defaults(
+    query_engine_tools=api_query_engine_tools,
+    response_synthesizer=response_synth,
+    verbose=settings.VERBOSE,
+    use_async=True,
+)</code></pre>
+    <div class="explain">
+      <ul class="points">
+        <li>이번엔 벡터 검색이 아니라 <b>polygon.io 외부 API</b>를 호출하는 도구들(<code>get_api_query_engine_tool</code>, 파일 6에서 정의)을 모아 두 번째 <code>SubQuestionQueryEngine</code>인 "정량적 질문 엔진(quantitative)"을 만듭니다.</li>
+        <li>같은 <code>SubQuestionQueryEngine</code> 클래스가 <b>도구의 종류(벡터 검색 vs API 호출)와 무관하게 재사용</b>된다는 점이 중요합니다 — <code>QueryEngineTool</code>이라는 공통 인터페이스만 지키면 무엇이든 서브 질문 엔진의 부품이 될 수 있습니다.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3 style="margin-top:32px">4-6. 두 서브 엔진을 다시 도구로 묶어 최상위 에이전트 생성</h3>
+  <div class="chunk">
+    <pre><code>top_level_sub_tools = [
+    QueryEngineTool(
+        query_engine=qualitative_question_engine,
+        metadata=ToolMetadata(name="qualitative_question_engine", description="..."),
+    ),
+    QueryEngineTool(
+        query_engine=quantitative_question_engine,
+        metadata=ToolMetadata(name="quantitative_question_engine", description="..."),
+    ),
+]
+
+chat_llm = OpenAI(temperature=0, model=settings.OPENAI_CHAT_LLM_NAME, streaming=True, api_key=settings.OPENAI_API_KEY)
+chat_history = get_chat_history(conversation.messages)
+
+chat_engine = OpenAIAgent.from_tools(
+    tools=top_level_sub_tools,
+    llm=chat_llm,
+    chat_history=chat_history,
+    verbose=settings.VERBOSE,
+    system_prompt=SYSTEM_MESSAGE.format(doc_titles=doc_titles, curr_date=curr_date),
+    callback_manager=callback_manager,
+    max_function_calls=3,
+)
+return chat_engine</code></pre>
+    <div class="explain">
+      <ul class="points">
+        <li><b>여기가 이 프로젝트에서 가장 중요한 패턴입니다:</b> (4-5)에서 만든 <code>SubQuestionQueryEngine</code> 2개(정성/정량)를 <b>다시 한번</b> <code>QueryEngineTool</code>로 포장해서 <code>OpenAIAgent</code>에 넣습니다. 즉 "도구 → 서브질문엔진 → 그 서브질문엔진을 다시 도구로 → 최상위 에이전트"라는 <b>계층 구조(nested tools)</b>입니다.</li>
+        <li><code>OpenAI(streaming=True)</code> — 응답을 토큰 단위로 조금씩 받을 수 있게 스트리밍 모드로 LLM을 생성합니다. (파일 7에서 이 스트림을 SSE로 그대로 흘려보냄)</li>
+        <li><code>OpenAIAgent.from_tools(tools=[...], llm=..., system_prompt=..., max_function_calls=3)</code> — OpenAI의 <b>함수 호출(function calling)</b> 기능을 이용한 에이전트를 생성합니다. LLM이 사용자 질문을 보고 "qualitative_question_engine을 호출해야겠다" 또는 "quantitative_question_engine을 호출해야겠다"를 스스로 판단해서 함수처럼 호출합니다. <code>max_function_calls=3</code>은 무한 루프 방지를 위한 최대 반복 횟수 제한.</li>
+        <li><code>chat_history=chat_history</code> — DB에 저장된 과거 메시지들을 <code>ChatMessage</code> 리스트로 변환해 주입, 멀티턴 대화 맥락 유지.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="key">
+    <b>4번 파일 요약 (이것만 기억하면 됩니다):</b><br>
+    PDF → <code>PDFReader</code> → <code>VectorStoreIndex.from_documents()</code> (청크+임베딩+저장 한번에) → 문서별 <code>QueryEngineTool</code> → 이를 묶은 <code>SubQuestionQueryEngine</code> 2개(정성/정량) → 이 둘을 다시 <code>QueryEngineTool</code>로 포장 → 최상위 <code>OpenAIAgent</code>. <b>"도구를 계층적으로 쌓아 올린다"</b>가 LlamaIndex 에이전트 설계의 핵심 아이디어입니다.
+  </div>
+</section>
+
+<!-- ============ FILE 5 ============ -->
+<section class="filesec" id="f5">
+  <div class="filehead">
+    <span class="stepnum">5</span>
+    <h2>답변 합성 프롬프트 커스터마이징</h2>
+    <span class="filepath">backend/app/chat/qa_response_synth.py</span>
+  </div>
+  <p class="role">벡터 검색으로 관련 청크를 찾은 <b>다음</b>, 그 청크들로부터 실제 답변 문장을 만드는 단계(Response Synthesis)의 프롬프트를 SEC 문서에 특화되게 바꾸는 파일.</p>
+
+  <div class="chunk">
+    <pre><code>qa_template_str = f"""
+A user has selected a set of SEC filing documents and has asked a question about them. \
+The SEC documents have the following titles:
+{doc_titles}
+Context information is below.
+---------------------
+{{context_str}}
+---------------------
+Given the context information and not prior knowledge, \
+answer the query.
+Query: {{query_str}}
+Answer:
+""".strip()
+qa_prompt = QuestionAnswerPrompt(template=qa_template_str, prompt_type=PromptType.QUESTION_ANSWER)
+
+return get_response_synthesizer(
+    callback_manager=callback_manager,
+    refine_template=refine_prompt,
+    text_qa_template=qa_prompt,
+    structured_answer_filtering=False,
+)</code></pre>
+    <div class="explain">
+      <ul class="points">
+        <li><b>배경 지식:</b> LlamaIndex의 기본 답변 합성 전략은 "Refine"입니다 — 검색된 청크들을 하나씩 순서대로 LLM에 먹여서, 처음엔 <code>text_qa_template</code>(최초 답변 생성용 프롬프트)으로 답을 만들고, 두 번째 청크부터는 <code>refine_template</code>(기존 답을 새 정보로 다듬는 프롬프트)을 씁니다.</li>
+        <li><code>{{context_str}}</code>, <code>{{query_str}}</code> — 이건 파이썬 f-string의 <code>{{ }}</code> 이스케이프입니다. f-string으로 <code>doc_titles</code>는 지금 채워 넣고, <code>context_str</code>/<code>query_str</code>은 <b>나중에 LlamaIndex가 채워 넣을</b> 자리이므로 <code>{{{{ }}}}</code>처럼 이중 중괄호로 이스케이프한 것입니다. 즉 이 템플릿엔 이중 치환이 있습니다: 1) 지금 파이썬 f-string이 <code>doc_titles</code>를 채움, 2) 나중에 LlamaIndex 내부에서 <code>context_str</code>/<code>query_str</code>을 채움.</li>
+        <li>이렇게 커스텀 프롬프트를 쓰는 이유: 기본 프롬프트는 범용적이라, "이건 SEC 재무제표 문서다", "사전 지식 말고 반드시 주어진 컨텍스트만 근거로 답하라" 같은 <b>도메인 특화 지시</b>가 없습니다. 이걸 넣으면 환각(hallucination)이 줄고 답변이 더 근거 있게 나옵니다.</li>
+        <li><code>get_response_synthesizer(...)</code> — LlamaIndex가 제공하는 팩토리 함수로, 위 두 템플릿을 넣은 <code>BaseSynthesizer</code> 구현체(기본은 <code>CompactAndRefine</code> 계열)를 만들어 돌려줍니다. 이 결과가 파일 4의 <code>response_synth</code>로 쓰였습니다.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FILE 6 ============ -->
+<section class="filesec" id="f6">
+  <div class="filehead">
+    <span class="stepnum">6</span>
+    <h2>외부 API를 에이전트 도구로 감싸기</h2>
+    <span class="filepath">backend/app/chat/tools.py</span>
+  </div>
+  <p class="role">벡터 검색이 아니라 <b>polygon.io 금융 API</b>를 호출해서 정확한 숫자(매출, 순이익 등)를 가져오는 도구를 정의합니다. RAG(검색)와 Tool-use(행동/API 호출)를 같은 인터페이스로 섞어 쓰는 예시입니다.</p>
+
+  <div class="chunk">
+    <pre><code>async def extract_data_from_sec_document(*args, **kwargs) -> List[str]:
+    try:
+        client = ReferenceClient(api_key=settings.POLYGON_IO_API_KEY, use_async=True)
+        response_dict = await client.get_stock_financials_vx(
+            ticker=sec_metadata.company_ticker,
+            period_of_report_date=str(sec_metadata.period_of_report_date.date()),
+            limit=100,
+        )
+        stock_financials = [StockFinancial.from_dict(r) for r in response_dict["results"]]
+        return [describe_financials(sf) for sf in stock_financials]
+    except:
+        return ["No answer found."]
+
+def sync_func_placeholder(*args, **kwargs) -> None:
+    raise NotImplementedError(...)
+
+return FunctionTool.from_defaults(
+    fn=sync_func_placeholder,
+    async_fn=extract_data_from_sec_document,
+    description=tool_metadata.description,
+)</code></pre>
+    <div class="explain">
+      <ul class="points">
+        <li>이 함수는 LlamaIndex와 무관한 <b>순수 비즈니스 로직</b>입니다: polygon.io의 재무 데이터 API를 호출해서 결과 JSON을 사람이 읽을 문장으로 변환(<code>describe_financials</code>)합니다.</li>
+        <li><span class="term">FunctionTool.from_defaults(fn=, async_fn=, description=)</span> — 여기서부터가 LlamaIndex 부분입니다. 이 팩토리 메서드가 평범한 파이썬 함수를 <b>에이전트가 호출할 수 있는 도구</b>로 바꿔줍니다. <code>fn</code>은 동기 버전, <code>async_fn</code>은 비동기 버전 — 이 프로젝트는 비동기만 실제로 쓰므로 동기 버전은 호출되면 에러를 던지는 더미(placeholder)로만 채워뒀습니다.</li>
+        <li><code>description</code>이 왜 중요한가: 에이전트(LLM)는 이 함수의 코드를 읽지 않습니다. 오직 <b>description 문자열</b>만 보고 "이 도구가 지금 필요한지"를 판단합니다. 즉 description은 함수의 API 문서이자 LLM에게 주는 유일한 단서입니다.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="chunk">
+    <pre><code>def get_api_query_engine_tool(document, callback_manager) -> QueryEngineTool:
+    polygon_io_tool = get_polygon_io_sec_tool(document)
+    llm = Settings.llm.model_copy(update={"callback_manager": callback_manager}, deep=True)
+    agent = OpenAIAgent.from_tools(
+        [polygon_io_tool],
+        llm=llm,
+        callback_manager=callback_manager,
+        system_prompt=f"You are an agent that is asked quantitative questions about a SEC filing named {doc_title} ...",
+    )
+    return QueryEngineTool.from_defaults(query_engine=agent, name=tool_metadata.name, description=tool_metadata.description)</code></pre>
+    <div class="explain">
+      <ul class="points">
+        <li>흥미로운 점: <b>문서 하나당 미니 에이전트를 하나씩 새로 만듭니다.</b> 이 미니 에이전트는 도구를 딱 하나(polygon.io 도구)만 가진 작은 <code>OpenAIAgent</code>입니다.</li>
+        <li><code>QueryEngineTool.from_defaults(query_engine=agent, ...)</code> — 여기가 재미있는 부분인데, <b>에이전트(Agent) 자체를 QueryEngineTool로 감쌉니다.</b> LlamaIndex의 <code>Agent</code>는 <code>BaseQueryEngine</code> 인터페이스를 구현하고 있어서 "쿼리 엔진처럼" 취급할 수 있습니다. 그래서 파일4의 <code>quantitative_question_engine</code>(SubQuestionQueryEngine)이 이 "에이전트를 감싼 쿼리엔진"을 부품으로 사용할 수 있는 것입니다.</li>
+        <li>정리하면 최종 호출 체인은: 최상위 <code>OpenAIAgent</code> → <code>quantitative_question_engine</code>(SubQuestionQueryEngine) → 문서별 미니 <code>OpenAIAgent</code> → <code>FunctionTool</code>(polygon.io 호출). <b>에이전트 안에 쿼리엔진, 쿼리엔진 안에 또 에이전트</b>가 들어가는 재귀적 합성이 가능하다는 걸 보여주는 실전 예시입니다.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FILE 7 ============ -->
+<section class="filesec" id="f7">
+  <div class="filehead">
+    <span class="stepnum">7</span>
+    <h2>콜백 → SSE 브릿지</h2>
+    <span class="filepath">backend/app/chat/messaging.py</span>
+  </div>
+  <p class="role">LlamaIndex 내부에서 일어나는 일(서브 질문, 도구 호출)을 <b>실시간으로 프론트엔드에 중계</b>하는 파일. LlamaIndex의 콜백 시스템과 파이썬 <code>asyncio</code> 스트림을 연결합니다.</p>
+
+  <div class="chunk">
+    <pre><code>class ChatCallbackHandler(BaseCallbackHandler):
+    def __init__(self, send_chan: MemoryObjectSendStream):
+        ignored_events = [CBEventType.CHUNKING, CBEventType.NODE_PARSING]
+        super().__init__(ignored_events, ignored_events)
+        self._send_chan = send_chan
+
+    def on_event_start(self, event_type, payload=None, event_id="", **kwargs) -> str:
+        asyncio.create_task(self.async_on_event(event_type, payload, event_id, is_start_event=True, **kwargs))
+
+    def on_event_end(self, event_type, payload=None, event_id="", **kwargs) -> None:
+        asyncio.create_task(self.async_on_event(event_type, payload, event_id, is_start_event=False, **kwargs))</code></pre>
+    <div class="explain">
+      <ul class="points">
+        <li><span class="term">BaseCallbackHandler</span> — LlamaIndex가 정의한 콜백 인터페이스. 이걸 상속하면 <code>on_event_start</code>/<code>on_event_end</code>가 인덱싱, 검색, LLM 호출, 서브 질문 생성 등 <b>모든 내부 단계마다</b> 자동으로 호출됩니다 (옵저버 패턴).</li>
+        <li><code>ignored_events = [CHUNKING, NODE_PARSING]</code> — 청크 분할처럼 너무 자주/시시콜콜하게 발생하는 이벤트는 무시하도록 필터링. 안 그러면 이벤트 폭탄으로 SSE가 스팸이 됩니다.</li>
+        <li><code>on_event_start/end</code>가 동기 함수인데 내부에서 <code>asyncio.create_task(...)</code>로 비동기 작업을 백그라운드로 던지는 이유: LlamaIndex의 콜백 인터페이스 자체는 동기(sync) 함수로 정의되어 있지만, 우리가 실제로 하고 싶은 작업(SSE로 전송)은 비동기 I/O이기 때문에 이렇게 "동기 콜백 안에서 비동기 태스크를 fire-and-forget으로 발사"하는 우회를 씁니다.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="chunk">
+    <pre><code>async def handle_chat_message(conversation, user_message, send_chan):
+    async with send_chan:
+        chat_engine = await get_chat_engine(ChatCallbackHandler(send_chan), conversation)
+        ...
+        streaming_chat_response = await chat_engine.astream_chat(templated_message)
+        response_str = ""
+        async for text in streaming_chat_response.async_response_gen():
+            response_str += text
+            await send_chan.send(StreamedMessage(content=response_str))</code></pre>
+    <div class="explain">
+      <ul class="points">
+        <li><code>ChatCallbackHandler(send_chan)</code>를 만들어 <code>get_chat_engine()</code>(파일 4)에 넘겨줍니다 → 파일 4에서 이 핸들러가 <code>CallbackManager([callback_handler])</code>로 감싸져 에이전트/쿼리엔진 전체에 배선됩니다.</li>
+        <li><code>chat_engine.astream_chat(message)</code> — <code>OpenAIAgent</code>의 스트리밍 채팅 메서드. 이 호출이 파일4에서 조립한 전체 파이프라인(에이전트→서브질문엔진→도구)을 실제로 <b>실행</b>시키는 트리거입니다.</li>
+        <li><code>async for text in streaming_chat_response.async_response_gen()</code> — LLM이 토큰을 생성할 때마다 <code>text</code> 조각이 넘어옵니다. <code>response_str</code>에 누적한 뒤 매번 <code>send_chan.send(...)</code>로 SSE 채널에 흘려보냅니다 (그래서 프론트엔드 화면에 타이핑되듯 답이 나타남).</li>
+        <li><code>send_chan</code>/<code>recv_chan</code>은 LlamaIndex가 아니라 <code>anyio</code>의 메모리 스트림입니다 — "이 함수(생산자)"와 "SSE 응답을 만드는 함수(소비자, 파일8)" 사이의 파이프라인 역할.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FILE 8 ============ -->
+<section class="filesec" id="f8">
+  <div class="filehead">
+    <span class="stepnum">8</span>
+    <h2>실제 HTTP 진입점 · 응답점</h2>
+    <span class="filepath">backend/app/api/endpoints/conversation.py</span>
+  </div>
+  <p class="role">프론트엔드가 실제로 호출하는 REST/SSE 엔드포인트. 지금까지 만든 파이프라인 전체가 여기서 트리거됩니다.</p>
+
+  <div class="chunk">
+    <pre><code>@router.get("/{conversation_id}/message")
+async def message_conversation(conversation_id: UUID, user_message: str, db: AsyncSession = Depends(get_db)) -> EventSourceResponse:
+    conversation = await crud.fetch_conversation_with_messages(db, str(conversation_id))
+    ...
+    send_chan, recv_chan = anyio.create_memory_object_stream(100)
+
+    async def event_publisher():
+        async with send_chan:
+            task = asyncio.create_task(handle_chat_message(conversation, user_message, send_chan))
+            ...
+            async for message_obj in recv_chan:
+                if isinstance(message_obj, StreamedMessage):
+                    message.content = message_obj.content
+                elif isinstance(message_obj, StreamedMessageSubProcess):
+                    ...
+                yield schema.Message.from_orm(message).json()
+            await task
+            ...
+    return EventSourceResponse(event_publisher())</code></pre>
+    <div class="explain">
+      <ul class="points">
+        <li><code>send_chan, recv_chan = anyio.create_memory_object_stream(100)</code> — 파일7의 <code>handle_chat_message</code>가 쓸 "보내는 쪽(send_chan)"과, 여기서 SSE로 내보낼 "받는 쪽(recv_chan)"을 만드는 파이프. 100은 버퍼 크기(백프레셔 방지).</li>
+        <li><code>asyncio.create_task(handle_chat_message(...))</code> — 파일7의 전체 파이프라인(에이전트 실행 포함)을 <b>백그라운드 태스크</b>로 시작합니다. 이 태스크가 실행되는 동안 아래 <code>async for</code> 루프가 그 결과를 소비합니다.</li>
+        <li><code>async for message_obj in recv_chan</code> — LlamaIndex 파이프라인에서 토큰/이벤트가 도착할 때마다 DB용 <code>Message</code>/<code>MessageSubProcess</code> 객체를 갱신하고 <code>yield</code>로 SSE 프레임을 하나씩 내보냅니다. 이 <code>yield</code>가 실제로 프론트엔드 브라우저에 도달하는 데이터입니다.</li>
+        <li><code>EventSourceResponse(event_publisher())</code> — FastAPI(정확히는 <code>sse_starlette</code>) 유틸로, 위 async generator를 <b>Server-Sent Events</b> HTTP 응답으로 감싸줍니다. 이게 이 앱의 <b>최종 HTTP 응답점</b>입니다.</li>
+        <li>이 함수 자체는 LlamaIndex를 직접 호출하지 않습니다 — LlamaIndex 관련 로직은 전부 <code>handle_chat_message</code>(파일7) 뒤로 위임되어 있고, 이 파일은 순수하게 "HTTP ↔ 내부 파이프라인 배선" 역할만 합니다.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FILE 9 ============ -->
+<section class="filesec" id="f9">
+  <div class="filehead">
+    <span class="stepnum">9</span>
+    <h2>오프라인 인덱스 구축 배치</h2>
+    <span class="filepath">backend/scripts/seed_storage_context.py</span>
+  </div>
+  <p class="role">서버가 뜨기 전에, DB에 등록된 모든 문서를 미리 인덱싱해서 S3/Postgres에 저장해두는 CLI 스크립트. 실제 채팅 요청 시 인덱싱 지연이 없도록 하는 사전 준비 작업입니다.</p>
+
+  <div class="chunk">
+    <pre><code>async def async_main_seed_storage_context():
+    fs = get_s3_fs()
+    async with SessionLocal() as db:
+        docs = await crud.fetch_documents(db)
+    callback_manager = CallbackManager([])
+    for doc in tqdm(docs, desc="Seeding storage with DB documents"):
+        await build_doc_id_to_index_map(callback_manager, [doc], fs=fs)
+
+def main_seed_storage_context():
+    asyncio.run(async_main_seed_storage_context())
+
+if __name__ == "__main__":
+    Fire(main_seed_storage_context)</code></pre>
+    <div class="explain">
+      <ul class="points">
+        <li>파일4에서 정의한 <b>바로 그 함수</b> <code>build_doc_id_to_index_map()</code>을 그대로 재사용합니다 — 즉 "실시간 채팅 시 인덱스를 로드/생성하는 로직"과 "배치로 미리 인덱스를 만드는 로직"이 코드 중복 없이 하나의 함수를 공유합니다. (앞서 4-4에서 배운 "없으면 만들고 있으면 로드한다" 로직이 여기서도 그대로 작동)</li>
+        <li><code>callback_manager = CallbackManager([])</code> — 빈 콜백 매니저. 배치 스크립트는 SSE로 뭔가를 스트리밍할 필요가 없으니 콜백 핸들러를 하나도 등록하지 않습니다.</li>
+        <li><code>Fire(main_seed_storage_context)</code> — 구글의 <code>python-fire</code> 라이브러리로, 이 함수를 커맨드라인에서 <code>python seed_storage_context.py</code>로 바로 실행 가능한 CLI로 만들어줍니다.</li>
+        <li>이 스크립트를 먼저 이해하고 나면, 파일4의 <code>build_doc_id_to_index_map</code>이 "실시간 요청 경로"와 "배치 인덱싱 경로" 양쪽에서 재사용되는 <b>공용 진입점</b>이라는 게 명확해집니다.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<div class="note" style="margin-top:60px">
+  <b>전체를 관통하는 3가지 LlamaIndex 패턴 요약</b>
+  <ol style="margin:8px 0 0 18px">
+    <li><b>Settings 전역 설정</b> — LLM/임베딩/청크 전략을 한 곳에 등록하면 이후 모든 인덱스·쿼리엔진이 암묵적으로 상속받는다.</li>
+    <li><b>무엇이든 Tool로 감쌀 수 있다</b> — 벡터 쿼리엔진(<code>QueryEngineTool</code>), 파이썬 함수(<code>FunctionTool</code>), 심지어 다른 에이전트까지 전부 같은 Tool 인터페이스로 감싸져서 상위 에이전트가 선택·호출할 수 있다.</li>
+    <li><b>도구는 계층적으로 쌓을 수 있다</b> — SubQuestionQueryEngine도, Agent도 결국 QueryEngineTool로 감싸질 수 있으므로, "에이전트 안에 쿼리엔진, 쿼리엔진 안에 에이전트"처럼 임의 깊이로 조합 가능하다.</li>
+  </ol>
+</div>
+
+<p><a class="back" href="llamaindex-analysis.html">← 개요/다이어그램 버전으로 돌아가기</a></p>
+
+<footer>SEC Insights 저장소 코드 정독 · analysis/llamaindex-deep-dive.html</footer>
+</main>
+</body>
+</html>
