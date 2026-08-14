@@ -51,6 +51,10 @@ stock_price_tool = FunctionTool.from_defaults(
 4. 이 두 도구를 가진 최상위 `FunctionAgent(tools=[...], llm=llm, verbose=True)` 생성
 5. 문서 질문, 주가 질문, 무관한 질문을 각각 `await top_agent.run(user_msg=...)`로 던져서 최상위 에이전트가 알맞은 경로로 라우팅하는지 확인
 
+## 캐싱
+
+Stage 5와 마찬가지로 `study/index_cache.py`로 `./storage_<provider>/`에 인덱스를 캐싱합니다. 처음 한 번만 임베딩 API가 호출되고, 그 다음부터는 재실행해도 몇 초 안에 끝납니다.
+
 ## 실행
 
 ```bash

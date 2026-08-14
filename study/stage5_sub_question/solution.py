@@ -15,11 +15,15 @@ from llama_index.core.tools import QueryEngineTool, ToolMetadata
 from llama_index.core.query_engine import SubQuestionQueryEngine
 from llama_index.core.question_gen.llm_generators import LLMQuestionGenerator
 
-from llm_provider import get_llm, get_embed_model, CHUNK_SIZE, CHUNK_OVERLAP
+from llm_provider import get_llm, get_embed_model, CHUNK_SIZE, CHUNK_OVERLAP, PROVIDER
+from index_cache import get_or_build_index
 
 PUBLIC_DIR = Path(__file__).resolve().parents[2] / "frontend" / "public"
 LYFT_PDF = PUBLIC_DIR / "lyft-2021-10k.pdf"
 UBER_PDF = PUBLIC_DIR / "uber-2021-10k.pdf"
+# 프로바이더마다 임베딩 차원/모델이 달라서 캐시 폴더를 분리합니다
+# (openai로 만든 인덱스를 nvidia로 재로딩하면 벡터 차원이 안 맞아 깨짐).
+PERSIST_DIR = Path(__file__).resolve().parent / f"storage_{PROVIDER}"
 
 DOC_ID_KEY = "db_document_id"
 
@@ -44,7 +48,7 @@ def main():
 
     lyft_docs = load_and_tag(LYFT_PDF, "lyft")
     uber_docs = load_and_tag(UBER_PDF, "uber")
-    index = VectorStoreIndex.from_documents(lyft_docs + uber_docs)
+    index = get_or_build_index(lyft_docs + uber_docs, str(PERSIST_DIR))
 
     tools = [
         QueryEngineTool(

@@ -16,11 +16,14 @@ from llama_index.core.tools import QueryEngineTool, ToolMetadata
 from llama_index.core.query_engine import SubQuestionQueryEngine
 from llama_index.core.question_gen.llm_generators import LLMQuestionGenerator
 
-from llm_provider import get_llm, get_embed_model, CHUNK_SIZE, CHUNK_OVERLAP
+from llm_provider import get_llm, get_embed_model, CHUNK_SIZE, CHUNK_OVERLAP, PROVIDER
+from index_cache import get_or_build_index
 
 PUBLIC_DIR = Path(__file__).resolve().parents[2] / "frontend" / "public"
 LYFT_PDF = PUBLIC_DIR / "lyft-2021-10k.pdf"
 UBER_PDF = PUBLIC_DIR / "uber-2021-10k.pdf"
+# 프로바이더마다 임베딩 차원/모델이 달라서 캐시 폴더를 분리합니다.
+PERSIST_DIR = Path(__file__).resolve().parent / f"storage_{PROVIDER}"
 
 DOC_ID_KEY = "db_document_id"  # Stage 3에서 배운 것: "doc_id"는 LlamaIndex 예약 키라 쓰면 안 됨
 
@@ -40,7 +43,7 @@ def main():
 
     lyft_docs = load_and_tag(LYFT_PDF, "lyft")
     uber_docs = load_and_tag(UBER_PDF, "uber")
-    index = VectorStoreIndex.from_documents(lyft_docs + uber_docs)
+    index = get_or_build_index(lyft_docs + uber_docs, str(PERSIST_DIR))
 
     # TODO 1: doc_id="lyft"인 청크만 검색하는 쿼리 엔진 생성
     #         힌트: filters = MetadataFilters(filters=[ExactMatchFilter(key=DOC_ID_KEY, value="lyft")])
@@ -54,8 +57,8 @@ def main():
 
     # TODO 3: 두 쿼리 엔진을 QueryEngineTool로 래핑 (name="lyft"/"uber", description은 의미있게)
     tools = [
-        QueryEngineTool(query_engine=lyft_query_engine, metadata=ToolMetadata(name="lyft", description="...")),
-        QueryEngineTool(query_engine=uber_query_engine, metadata=ToolMetadata(name="uber", description="...")),
+        QueryEngineTool(query_engine=lyft_query_engine, metadata=ToolMetadata(name="lyft", description="문서에 대한 정보")),
+        QueryEngineTool(query_engine=uber_query_engine, metadata=ToolMetadata(name="uber", description="문서에 대한 정보")),
     ]
 
     # TODO 4: LLMQuestionGenerator.from_defaults(llm=llm)로 질문 분해기 생성
