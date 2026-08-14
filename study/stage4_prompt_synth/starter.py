@@ -32,25 +32,32 @@ def main():
     default_engine = index.as_query_engine(similarity_top_k=1)
     default_response = default_engine.query(question)
     print("=" * 20, "기본 템플릿", "=" * 20)
-    print(default_response)
+    print("default_response : ", default_response)
 
     # ---- 2) 커스텀 템플릿 ----
     # TODO 1: {context_str}, {query_str} 자리표시자를 포함한 커스텀 QA 템플릿 문자열 작성
     #         "너는 SEC 재무제표 전문 애널리스트다. 반드시 문서에 나온 숫자를 인용해서 답하라" 같은 지시문 포함
-    custom_qa_template_str = None  # <- 여기를 채우세요 (f-string 아님, 그냥 문자열)
+    custom_qa_template_str = """
+너는 SEC 재무제표를 분석하는 전문 애널리스트다. 반드시 아래 문서에 나온 숫자를 그대로 인용해서 답하라.
+---------------------
+{context_str}
+---------------------
+질문: {query_str}
+답변: {{answer}}
+""".strip()  # <- 여기를 채우세요 (f-string 아님, 그냥 문자열)
 
     # TODO 2: QuestionAnswerPrompt(template=..., prompt_type=PromptType.QUESTION_ANSWER)로 프롬프트 객체 생성
-    custom_qa_prompt = None  # <- 여기를 채우세요
+    custom_qa_prompt = QuestionAnswerPrompt(template=custom_qa_template_str, prompt_type=PromptType.QUESTION_ANSWER)  # <- 여기를 채우세요
 
     # TODO 3: get_response_synthesizer(text_qa_template=custom_qa_prompt)로 synthesizer 생성
-    custom_synth = None  # <- 여기를 채우세요
+    custom_synth = get_response_synthesizer(text_qa_template=custom_qa_prompt)  # <- 여기를 채우세요
 
     # TODO 4: index.as_query_engine(response_synthesizer=custom_synth, similarity_top_k=1)로 재질의
-    custom_engine = None  # <- 여기를 채우세요
-    custom_response = None  # <- custom_engine.query(question)
+    custom_engine = index.as_query_engine(response_synthesizer=custom_synth, similarity_top_k=1)  # <- 여기를 채우세요
+    custom_response = custom_engine.query(question)  # <- custom_engine.query(question)
 
     print("\n" + "=" * 20, "커스텀 템플릿", "=" * 20)
-    print(custom_response)
+    print("custom_response : ", custom_response)
 
 
 if __name__ == "__main__":

@@ -16,11 +16,21 @@ python -m venv .venv
 pip install -r study/requirements.txt
 ```
 
-`study/.env.example`을 복사해서 `study/.env`를 만들고 `OPENAI_API_KEY`를 채워넣으세요.
+`study/.env.example`을 복사해서 `study/.env`를 만들고 값을 채워넣으세요.
 
 ```bash
 cp study/.env.example study/.env
 ```
+
+- Stage 0~4: `OPENAI_API_KEY`만 있으면 되고, 대부분 `MockEmbedding`/`MockLLM`으로 크레딧 없이 진행 가능합니다. 위 `pip install -r study/requirements.txt`로 충분합니다.
+- Stage 5~9: 실제 LLM이 필요합니다. `study/llm_provider.py`가 `LLM_PROVIDER` 값(`nvidia` 추천/무료, 또는 `openai`)에 따라 LLM/임베딩을 골라줍니다. NVIDIA 키는 [build.nvidia.com](https://build.nvidia.com)에서 무료로 발급받을 수 있습니다.
+  - **Stage 5로 넘어가기 전에 패키지를 한 번 더 업그레이드해야 합니다** (`requirements.txt`의 기본 설치만으로는 부족합니다 — NVIDIA 연동 패키지가 `llama-index-core>=0.13`을 요구해서 별도로 올려야 함):
+    ```bash
+    pip install "llama-index-core>=0.13,<0.15" "pandas>=2.3.3" llama-index-readers-file llama-index-embeddings-openai llama-index-llms-openai llama-index-llms-nvidia llama-index-embeddings-nvidia python-dotenv
+    pip uninstall -y llama-index-agent-openai llama-index-program-openai llama-index-question-gen-openai
+    ```
+  - 이 업그레이드 이후 `OpenAIAgent` 대신 provider 무관한 `FunctionAgent`를 씁니다 — 자세한 이유는 각 스테이지 README의 "API 변경" 절 참고.
+  - (Python 3.14를 쓴다면 `pandas`가 소스 빌드를 시도하다 실패할 수 있어 `pandas>=2.3.3`으로 버전을 명시해 wheel이 있는 버전을 강제합니다.)
 
 테스트용 PDF는 리포지토리에 이미 있는 걸 그대로 씁니다:
 `frontend/public/lyft-2021-10k.pdf`, `frontend/public/uber-2021-10k.pdf`

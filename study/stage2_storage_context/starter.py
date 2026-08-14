@@ -54,15 +54,16 @@ def main():
 
     # TODO 1: index.storage_context.persist(persist_dir=str(PERSIST_DIR))로 저장
     # 여기를 채우세요
+    index.storage_context.persist(persist_dir=str(PERSIST_DIR))
 
     # ---- 2차: 재로딩 ----
     CountingMockEmbedding.call_count = 0
 
     # TODO 2: StorageContext.from_defaults(persist_dir=str(PERSIST_DIR))로 storage_context 복원
-    storage_context = None  # <- 여기를 채우세요
+    storage_context = StorageContext.from_defaults(persist_dir=str(PERSIST_DIR))  # <- 여기를 채우세요
 
     # TODO 3: load_index_from_storage(storage_context)로 인덱스 재생성
-    reloaded_index = None  # <- 여기를 채우세요
+    reloaded_index = load_index_from_storage(storage_context)  # <- 여기를 채우세요
 
     print(f"[2차 재로딩] 노드 개수: {len(reloaded_index.docstore.docs)}, 임베딩 호출 횟수: {CountingMockEmbedding.call_count}")
 

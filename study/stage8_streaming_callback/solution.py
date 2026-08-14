@@ -1,22 +1,28 @@
 """
 Stage 8 — 참고 답안. 먼저 starter.py를 직접 채워본 뒤에 비교용으로만 여세요.
-실제 OpenAI API 키/크레딧이 필요합니다.
+NVIDIA NIM(무료) 또는 OpenAI(유료) 중 study/.env의 LLM_PROVIDER로 선택된 프로바이더를 씁니다.
+
+OpenAIAgent 시절엔 콜백을 BaseCallbackHandler로 잡았지만, FunctionAgent는
+Workflow 기반이라 이벤트를 handler.stream_events()로 직접 순회해서 관찰합니다.
+스트리밍 토큰과 "중간 상태 관찰"이 같은 스트림 안에서 자연스럽게 합쳐집니다
+(sec-insights의 messaging.py가 콜백+스트리밍을 SSE 하나로 합치는 것과 같은 아이디어).
 """
-import os
+import asyncio
 import sys
 from pathlib import Path
-from typing import Any, Dict, Optional
-from dotenv import load_dotenv
 
 sys.stdout.reconfigure(encoding="utf-8")
-load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from llama_index.core.tools import FunctionTool
-from llama_index.core.callbacks.base import BaseCallbackHandler
-from llama_index.core.callbacks.schema import CBEventType
-from llama_index.core.callbacks import CallbackManager
-from llama_index.agent.openai import OpenAIAgent
-from llama_index.llms.openai import OpenAI
+from llama_index.core.agent.workflow import (
+    FunctionAgent,
+    AgentStream,
+    ToolCall,
+    ToolCallResult,
+)
+
+from llm_provider import get_llm
 
 FAKE_PRICES = {"UBER": 72.5, "LYFT": 11.3}
 
@@ -27,51 +33,29 @@ def get_fake_stock_price(ticker: str) -> str:
     return "정보 없음" if price is None else f"{ticker.upper()} 현재가: ${price}"
 
 
-class PrintCallbackHandler(BaseCallbackHandler):
-    def __init__(self):
-        ignored = [CBEventType.CHUNKING, CBEventType.NODE_PARSING]
-        super().__init__(ignored, ignored)
-
-    def on_event_start(self, event_type: CBEventType, payload: Optional[Dict[str, Any]] = None, event_id: str = "", **kwargs: Any) -> str:
-        print(f">>> START {event_type}")
-        return event_id
-
-    def on_event_end(self, event_type: CBEventType, payload: Optional[Dict[str, Any]] = None, event_id: str = "", **kwargs: Any) -> None:
-        print(f"<<< END   {event_type}")
-
-    def start_trace(self, trace_id: Optional[str] = None) -> None:
-        pass
-
-    def end_trace(self, trace_id: Optional[str] = None, trace_map=None) -> None:
-        pass
-
-
-def main():
-    assert os.environ.get("OPENAI_API_KEY"), "study/.env에 OPENAI_API_KEY를 채워주세요"
-
-    llm = OpenAI(model="gpt-4o-mini", temperature=0, streaming=True)
+async def main():
+    llm = get_llm()
     stock_tool = FunctionTool.from_defaults(
         fn=get_fake_stock_price,
         description="주식 티커(예: UBER, LYFT)를 받아 현재 주가를 반환한다.",
     )
+    agent = FunctionAgent(tools=[stock_tool], llm=llm, verbose=False)
 
-    callback_manager = CallbackManager([PrintCallbackHandler()])
+    print("=" * 20, "스트리밍 + 이벤트 관찰", "=" * 20)
+    handler = agent.run(user_msg="LYFT 주가 알려줘")
 
-    agent = OpenAIAgent.from_tools(
-        [stock_tool], llm=llm, verbose=False, callback_manager=callback_manager
-    )
+    async for event in handler.stream_events():
+        if isinstance(event, ToolCall):
+            print(f"\n>>> TOOL CALL   name={event.tool_name} args={event.tool_kwargs}")
+        elif isinstance(event, ToolCallResult):
+            print(f">>> TOOL RESULT {event.tool_output}")
+        elif isinstance(event, AgentStream):
+            # LLM이 생성하는 토큰 조각. 여기가 "진짜 스트리밍" 부분.
+            print(event.delta, end="", flush=True)
 
-    print("=" * 20, "콜백 로그 관찰", "=" * 20)
-    response = agent.chat("UBER 주가 알려줘")
-    print("\n최종 답변:", response)
-
-    print("\n" + "=" * 20, "스트리밍 관찰", "=" * 20)
-    streaming_response = agent.stream_chat("LYFT 주가 알려줘")
-
-    for token in streaming_response.response_gen:
-        print(token, end="", flush=True)
-    print()
+    final_response = await handler
+    print("\n\n최종 답변:", final_response)
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

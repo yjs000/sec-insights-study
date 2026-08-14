@@ -3,17 +3,18 @@
 ## 목표
 Stage 8까지 만든 스트리밍+콜백을 실제 HTTP 엔드포인트 하나로 묶습니다. DB도, 여러 대화방도 없이 **메모리에 대화 1개만** 유지하는 최소 버전이지만, 여기까지 만들고 나면 sec-insights의 [conversation.py](../../backend/app/api/endpoints/conversation.py) + [messaging.py](../../backend/app/chat/messaging.py)를 거의 그대로 읽을 수 있는 상태가 됩니다.
 
-## ⚠️ 실제 OpenAI 크레딧 필요. `pip install -r ../requirements.txt`로 fastapi/uvicorn/sse-starlette 설치 필요.
+## ⚠️ 실제 LLM 필요 (무료 NVIDIA NIM 사용 가능). `pip install -r ../requirements.txt`로 fastapi/uvicorn/sse-starlette 설치 필요.
 
 ## 할 일
 
-`starter.py`의 TODO를 채우세요.
+`starter.py`의 TODO를 채우세요. Stage 8과 동일하게 `FunctionAgent` + `handler.stream_events()`를 씁니다 (구식 `astream_chat()`이 아님).
 
-1. `anyio.create_memory_object_stream(100)`으로 `send_chan, recv_chan` 생성 (conversation.py와 동일한 패턴)
-2. Stage 8의 에이전트 실행 로직을 `async def run_agent(question, send_chan)`으로 감싸서, 토큰이 생성될 때마다 `send_chan.send(token_so_far)`
-3. `asyncio.create_task(run_agent(question, send_chan))`으로 백그라운드 실행 시작
-4. `async def event_publisher(): async for msg in recv_chan: yield msg` 형태의 제너레이터 작성
-5. `EventSourceResponse(event_publisher())`를 FastAPI 라우트에서 반환
+1. `run_agent(question, send_chan)` 안에서 `handler = agent.run(user_msg=question)`로 핸들 받기
+2. `async for event in handler.stream_events():`로 순회하며 `AgentStream`이면 `response_str`에 `event.delta`를 누적하고 `send_chan.send(response_str)`
+3. `await handler`로 워크플로우가 끝날 때까지 대기 (예외가 있으면 여기서 전파됨)
+4. `anyio.create_memory_object_stream(100)`으로 `send_chan, recv_chan` 생성 (conversation.py와 동일한 패턴)
+5. `asyncio.create_task(run_agent(question, send_chan))`으로 백그라운드 실행 시작
+6. `async def event_publisher(): async for msg in recv_chan: yield msg` 형태의 제너레이터 작성 → `EventSourceResponse(event_publisher())`로 반환
 
 ## 실행
 

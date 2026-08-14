@@ -1,27 +1,26 @@
 """
 Stage 9 (선택) — 참고 답안. 먼저 starter.py를 직접 채워본 뒤에 비교용으로만 여세요.
-실제 OpenAI API 키/크레딧이 필요합니다.
+NVIDIA NIM(무료) 또는 OpenAI(유료) 중 study/.env의 LLM_PROVIDER로 선택된 프로바이더를 씁니다.
 
 실행: python solution.py
 테스트: 다른 터미널에서 curl -N "http://localhost:8010/chat?q=UBER+주가+알려줘"
 """
 import asyncio
-import os
 import sys
 from pathlib import Path
 
 import anyio
 import uvicorn
-from dotenv import load_dotenv
 from fastapi import FastAPI
 from sse_starlette.sse import EventSourceResponse
 
 sys.stdout.reconfigure(encoding="utf-8")
-load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from llama_index.core.tools import FunctionTool
-from llama_index.agent.openai import OpenAIAgent
-from llama_index.llms.openai import OpenAI
+from llama_index.core.agent.workflow import FunctionAgent, AgentStream
+
+from llm_provider import get_llm
 
 FAKE_PRICES = {"UBER": 72.5, "LYFT": 11.3}
 
@@ -32,24 +31,28 @@ def get_fake_stock_price(ticker: str) -> str:
     return "정보 없음" if price is None else f"{ticker.upper()} 현재가: ${price}"
 
 
-def build_agent() -> OpenAIAgent:
-    llm = OpenAI(model="gpt-4o-mini", temperature=0, streaming=True)
+def build_agent() -> FunctionAgent:
+    llm = get_llm()
     stock_tool = FunctionTool.from_defaults(
         fn=get_fake_stock_price,
         description="주식 티커(예: UBER, LYFT)를 받아 현재 주가를 반환한다.",
     )
-    return OpenAIAgent.from_tools([stock_tool], llm=llm, verbose=False)
+    return FunctionAgent(tools=[stock_tool], llm=llm, verbose=False)
 
 
 async def run_agent(question: str, send_chan: anyio.streams.memory.MemoryObjectSendStream):
+    """messaging.py의 handle_chat_message와 동일한 구조: 토큰이 생성될 때마다 채널로 흘려보냄"""
     async with send_chan:
         agent = build_agent()
-        streaming_response = await agent.astream_chat(question)
+        handler = agent.run(user_msg=question)
 
         response_str = ""
-        async for token in streaming_response.async_response_gen():
-            response_str += token
-            await send_chan.send(response_str)
+        async for event in handler.stream_events():
+            if isinstance(event, AgentStream):
+                response_str += event.delta
+                await send_chan.send(response_str)
+
+        await handler  # 워크플로우가 완전히 끝날 때까지 대기 (예외 전파 포함)
 
 
 app = FastAPI()
@@ -70,7 +73,6 @@ async def chat(q: str):
 
 
 def main():
-    assert os.environ.get("OPENAI_API_KEY"), "study/.env에 OPENAI_API_KEY를 채워주세요"
     uvicorn.run(app, host="0.0.0.0", port=8010)
 
 

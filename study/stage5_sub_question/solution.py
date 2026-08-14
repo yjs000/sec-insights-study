@@ -1,22 +1,21 @@
 """
 Stage 5 — 참고 답안. 먼저 starter.py를 직접 채워본 뒤에 비교용으로만 여세요.
-실제 OpenAI API 키/크레딧이 필요합니다.
+NVIDIA NIM(무료) 또는 OpenAI(유료) 중 study/.env의 LLM_PROVIDER로 선택된 프로바이더를 씁니다.
 """
-import os
 import sys
 from pathlib import Path
-from dotenv import load_dotenv
 
 sys.stdout.reconfigure(encoding="utf-8")
-load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # study/llm_provider.py 임포트용
 
 from llama_index.core import SimpleDirectoryReader, VectorStoreIndex, Settings
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.vector_stores.types import MetadataFilters, ExactMatchFilter
 from llama_index.core.tools import QueryEngineTool, ToolMetadata
 from llama_index.core.query_engine import SubQuestionQueryEngine
-from llama_index.embeddings.openai import OpenAIEmbedding
-from llama_index.llms.openai import OpenAI
+from llama_index.core.question_gen.llm_generators import LLMQuestionGenerator
+
+from llm_provider import get_llm, get_embed_model, CHUNK_SIZE, CHUNK_OVERLAP
 
 PUBLIC_DIR = Path(__file__).resolve().parents[2] / "frontend" / "public"
 LYFT_PDF = PUBLIC_DIR / "lyft-2021-10k.pdf"
@@ -38,38 +37,33 @@ def query_engine_for(index: VectorStoreIndex, doc_id: str):
 
 
 def main():
-    assert os.environ.get("OPENAI_API_KEY"), "study/.env에 OPENAI_API_KEY를 채워주세요"
-
-    Settings.llm = OpenAI(model="gpt-4o-mini", temperature=0)
-    Settings.embed_model = OpenAIEmbedding()
-    Settings.transformations = [SentenceSplitter(chunk_size=512, chunk_overlap=10)]
+    llm = get_llm()
+    Settings.llm = llm
+    Settings.embed_model = get_embed_model()
+    Settings.transformations = [SentenceSplitter(chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP)]
 
     lyft_docs = load_and_tag(LYFT_PDF, "lyft")
     uber_docs = load_and_tag(UBER_PDF, "uber")
     index = VectorStoreIndex.from_documents(lyft_docs + uber_docs)
 
-    lyft_query_engine = query_engine_for(index, "lyft")
-    uber_query_engine = query_engine_for(index, "uber")
-
     tools = [
         QueryEngineTool(
-            query_engine=lyft_query_engine,
-            metadata=ToolMetadata(
-                name="lyft",
-                description="Lyft의 2021년 SEC 10-K 재무보고서. 매출, 비용, 리스크 요인 등을 담고 있음.",
-            ),
+            query_engine=query_engine_for(index, "lyft"),
+            metadata=ToolMetadata(name="lyft", description="Lyft의 2021년 SEC 10-K 재무보고서"),
         ),
         QueryEngineTool(
-            query_engine=uber_query_engine,
-            metadata=ToolMetadata(
-                name="uber",
-                description="Uber의 2021년 SEC 10-K 재무보고서. 매출, 비용, 리스크 요인 등을 담고 있음.",
-            ),
+            query_engine=query_engine_for(index, "uber"),
+            metadata=ToolMetadata(name="uber", description="Uber의 2021년 SEC 10-K 재무보고서"),
         ),
     ]
 
+    # llama-index-question-gen-openai 없이도 동작하는 범용(LLM 프롬프트 기반) 질문 분해기.
+    # (llama-index-core>=0.13에서는 OpenAI 전용 question-gen 패키지가 지원되지 않음)
+    question_gen = LLMQuestionGenerator.from_defaults(llm=llm)
+
     sub_question_engine = SubQuestionQueryEngine.from_defaults(
         query_engine_tools=tools,
+        question_gen=question_gen,
         verbose=True,
     )
 

@@ -30,7 +30,7 @@ def load_and_tag(pdf_path: Path, doc_id: str):
     docs = SimpleDirectoryReader(input_files=[str(pdf_path)]).load_data()
     # TODO 1: 각 Document의 metadata[DOC_ID_KEY]에 doc_id 값을 채워넣기
     for doc in docs:
-        pass  # <- 여기를 채우세요
+        doc.metadata[DOC_ID_KEY] = doc_id # <- 여기를 채우세요
     return docs
 
 
@@ -48,23 +48,23 @@ def main():
     uber_docs = load_and_tag(UBER_PDF, "uber")
 
     # TODO 2: lyft_docs + uber_docs를 합쳐 하나의 VectorStoreIndex 생성
-    index = None  # <- 여기를 채우세요
+    index = VectorStoreIndex.from_documents(lyft_docs + uber_docs)  # <- 여기를 채우세요
 
     question = "What were the total revenues?"
 
     # ---- 필터 없이 검색 ----
     # TODO 3: index.as_query_engine(similarity_top_k=6)으로 쿼리 엔진 생성 후 질의
-    unfiltered_engine = None  # <- 여기를 채우세요
-    unfiltered_response = None  # <- unfiltered_engine.query(question)
+    unfiltered_engine = index.as_query_engine(similarity_top_k=6)  # <- 여기를 채우세요
+    unfiltered_response = unfiltered_engine.query(question)  # <- unfiltered_engine.query(question)
     print_source_doc_ids("필터 없음", unfiltered_response)
 
     # ---- uber만 필터링해서 검색 ----
     # TODO 4: MetadataFilters(filters=[ExactMatchFilter(key=DOC_ID_KEY, value="uber")]) 생성
-    uber_filter = None  # <- 여기를 채우세요
+    uber_filter = MetadataFilters(filters=[ExactMatchFilter(key=DOC_ID_KEY, value="uber")])  # <- 여기를 채우세요
 
     # TODO 5: filters=uber_filter를 넣어 쿼리 엔진 생성 후 같은 질문 재질의
-    filtered_engine = None  # <- 여기를 채우세요
-    filtered_response = None  # <- filtered_engine.query(question)
+    filtered_engine = index.as_query_engine(similarity_top_k=6,filters=uber_filter)  # <- 여기를 채우세요
+    filtered_response = filtered_engine.query(question)  # <- filtered_engine.query(question)
     print_source_doc_ids("uber 필터", filtered_response)
 
 
