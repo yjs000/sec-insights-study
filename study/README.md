@@ -23,7 +23,7 @@ cp study/.env.example study/.env
 ```
 
 - Stage 0~4: `OPENAI_API_KEY`만 있으면 되고, 대부분 `MockEmbedding`/`MockLLM`으로 크레딧 없이 진행 가능합니다. 위 `pip install -r study/requirements.txt`로 충분합니다.
-- Stage 5~9: 실제 LLM이 필요합니다. `study/llm_provider.py`가 `LLM_PROVIDER` 값(`nvidia` 추천/무료, 또는 `openai`)에 따라 LLM/임베딩을 골라줍니다. NVIDIA 키는 [build.nvidia.com](https://build.nvidia.com)에서 무료로 발급받을 수 있습니다.
+- Stage 5~7: 실제 LLM이 필요합니다. `study/llm_provider.py`가 `LLM_PROVIDER` 값(`nvidia` 추천/무료, 또는 `openai`)에 따라 LLM/임베딩을 골라줍니다. NVIDIA 키는 [build.nvidia.com](https://build.nvidia.com)에서 무료로 발급받을 수 있습니다.
   - **Stage 5로 넘어가기 전에 패키지를 한 번 더 업그레이드해야 합니다** (`requirements.txt`의 기본 설치만으로는 부족합니다 — NVIDIA 연동 패키지가 `llama-index-core>=0.13`을 요구해서 별도로 올려야 함):
     ```bash
     pip install "llama-index-core>=0.13,<0.15" "pandas>=2.3.3" llama-index-readers-file llama-index-embeddings-openai llama-index-llms-openai llama-index-llms-nvidia llama-index-embeddings-nvidia python-dotenv
@@ -45,10 +45,10 @@ cp study/.env.example study/.env
 | 3 | `stage3_metadata_filter` | 문서 여러 개를 한 인덱스에 + 필터링 | `engine.py: index_to_query_engine()` |
 | 4 | `stage4_prompt_synth` | 답변 합성 프롬프트 커스터마이징 | `qa_response_synth.py` |
 | 5 | `stage5_sub_question` | QueryEngineTool + SubQuestionQueryEngine | `engine.py` 230행대 |
-| 6 | `stage6_function_tool` | 파이썬 함수를 도구로 (FunctionTool) | `tools.py` |
-| 7 | `stage7_agent_of_agents` | 도구의 계층적 조합 (에이전트를 도구로) | `engine.py` 250~301행 |
-| 8 | `stage8_streaming_callback` | 스트리밍 응답 + 콜백 이벤트 | `messaging.py` |
-| 9 | `stage9_mini_fastapi` (선택) | SSE 엔드포인트로 묶기 | `conversation.py` |
+| 6 | `stage6_mini_agent` | FunctionTool + 에이전트를 도구로 + 최상위 에이전트 + `Context`로 멀티턴 대화 (REPL) | `engine.py: get_chat_engine()` 전체 |
+| 7 | `stage7_streaming_web` | 스트리밍 + FastAPI SSE + 브라우저 채팅 데모 | `conversation.py` + `messaging.py` + `main.py` lifespan |
+
+Stage 6~7은 이전 세부 스테이지(함수 도구화 / 에이전트 계층 조합 / 스트리밍 / SSE 서버)를 두 개로 합쳐서, 부품을 하나씩 보는 대신 한 번에 조립해 눈에 보이는 결과물(REPL 챗봇 → 브라우저 챗봇)을 만들도록 구성했습니다.
 
 각 스테이지를 마치면 저한테 코드를 보여주세요 — 리뷰하고 다음 스테이지로 넘어가겠습니다.
 진행하면서 이해가 바뀐 부분이나 막혔던 부분은 `/wiki-study-log`로 따로 기록할 수 있습니다.

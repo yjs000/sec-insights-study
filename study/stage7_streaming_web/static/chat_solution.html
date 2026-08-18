@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>미니 sec-insights</title>
+<style>
+  body { font-family: -apple-system, "Segoe UI", sans-serif; max-width: 640px; margin: 40px auto; padding: 0 16px; }
+  h1 { font-size: 1.3rem; }
+  #question { width: 100%; padding: 10px; font-size: 1rem; box-sizing: border-box; }
+  button { padding: 10px 16px; margin-top: 8px; cursor: pointer; }
+  #answer {
+    margin-top: 20px; padding: 16px; border: 1px solid #ccc; border-radius: 8px;
+    white-space: pre-wrap; min-height: 60px; background: #fafafa;
+  }
+  .hint { color: #888; font-size: 0.85rem; }
+</style>
+</head>
+<body>
+  <h1>미니 sec-insights 에이전트</h1>
+  <p class="hint">예: "Uber의 2021년 주요 리스크 요인이 뭐야?" / "UBER 주가는 얼마야?"</p>
+
+  <input id="question" type="text" placeholder="질문을 입력하세요" />
+  <button id="send">전송</button>
+
+  <div id="answer">여기에 답변이 실시간으로 나타납니다.</div>
+
+  <script>
+    const questionInput = document.getElementById("question");
+    const sendButton = document.getElementById("send");
+    const answerDiv = document.getElementById("answer");
+
+    function askQuestion() {
+      const question = questionInput.value.trim();
+      if (!question) return;
+
+      answerDiv.textContent = "";
+      sendButton.disabled = true;
+
+      const es = new EventSource(`/chat?q=${encodeURIComponent(question)}`);
+
+      es.onmessage = (event) => {
+        answerDiv.textContent = event.data;
+      };
+
+      es.onerror = () => {
+        es.close();
+        sendButton.disabled = false;
+      };
+    }
+
+    sendButton.addEventListener("click", askQuestion);
+    questionInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") askQuestion();
+    });
+  </script>
+</body>
+</html>

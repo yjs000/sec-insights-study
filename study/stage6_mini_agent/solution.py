@@ -1,6 +1,5 @@
 """
-Stage 7 — 도구의 계층적 조합 (에이전트를 다시 도구로)
-TODO 표시된 부분만 채우세요. README.md를 먼저 읽으세요.
+Stage 6 — 참고 답안. 먼저 starter.py를 직접 채워본 뒤에 비교용으로만 여세요.
 NVIDIA NIM(무료) 또는 OpenAI(유료) 중 study/.env의 LLM_PROVIDER로 선택된 프로바이더를 씁니다.
 """
 import asyncio
@@ -10,6 +9,7 @@ from pathlib import Path
 sys.stdout.reconfigure(encoding="utf-8")
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from workflows import Context
 from llama_index.core import SimpleDirectoryReader, VectorStoreIndex, Settings
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.vector_stores.types import MetadataFilters, ExactMatchFilter
@@ -24,7 +24,6 @@ from index_cache import get_or_build_index
 PUBLIC_DIR = Path(__file__).resolve().parents[2] / "frontend" / "public"
 LYFT_PDF = PUBLIC_DIR / "lyft-2021-10k.pdf"
 UBER_PDF = PUBLIC_DIR / "uber-2021-10k.pdf"
-# 프로바이더마다 임베딩 차원/모델이 달라서 캐시 폴더를 분리합니다.
 PERSIST_DIR = Path(__file__).resolve().parent / f"storage_{PROVIDER}"
 DOC_ID_KEY = "db_document_id"
 FAKE_PRICES = {"UBER": 72.5, "LYFT": 11.3}
@@ -48,8 +47,9 @@ def get_fake_stock_price(ticker: str) -> str:
     return "정보 없음" if price is None else f"{ticker.upper()} 현재가: ${price}"
 
 
-def build_sub_question_engine(llm) -> SubQuestionQueryEngine:
-    """Stage 5와 동일한 문서 검색용 SubQuestionQueryEngine (BaseQueryEngine이라 QueryEngineTool로 바로 감쌀 수 있음)"""
+# ---------- 1. 문서 검색 도구 (Stage 5 재사용) ----------
+
+def build_document_qa_tool(llm) -> QueryEngineTool:
     lyft_docs = load_and_tag(LYFT_PDF, "lyft")
     uber_docs = load_and_tag(UBER_PDF, "uber")
     index = get_or_build_index(lyft_docs + uber_docs, str(PERSIST_DIR))
@@ -65,36 +65,38 @@ def build_sub_question_engine(llm) -> SubQuestionQueryEngine:
         ),
     ]
     question_gen = LLMQuestionGenerator.from_defaults(llm=llm)
-    return SubQuestionQueryEngine.from_defaults(
+    sub_question_engine = SubQuestionQueryEngine.from_defaults(
         query_engine_tools=tools, question_gen=question_gen, verbose=True
+    )
+    return QueryEngineTool.from_defaults(
+        query_engine=sub_question_engine,
+        name="document_qa",
+        description="Lyft/Uber의 2021년 SEC 재무보고서 내용에 대한 질문(리스크 요인, 매출 등)에 답한다.",
     )
 
 
-def build_stock_agent(llm) -> FunctionAgent:
-    """Stage 6과 동일한 가짜 주가 조회 에이전트"""
+# ---------- 2. 주가 조회 에이전트 (Stage 6/7 재사용) ----------
+
+def build_stock_price_tool(llm) -> FunctionTool:
     stock_tool = FunctionTool.from_defaults(
         fn=get_fake_stock_price,
         description="주식 티커(예: UBER, LYFT)를 받아 현재 주가를 반환한다.",
     )
-    return FunctionAgent(tools=[stock_tool], llm=llm, verbose=True)
+    stock_agent = FunctionAgent(tools=[stock_tool], llm=llm, verbose=True)
 
-
-def make_stock_agent_tool(stock_agent: FunctionAgent) -> FunctionTool:
-    """FunctionAgent는 BaseQueryEngine이 아니라서(.query()가 없음) QueryEngineTool로
-    바로 못 감쌉니다. FunctionTool의 async_fn 안에서 stock_agent.run()을 호출하는
-    래퍼 함수를 만들어 그걸 도구화합니다."""
-
-    # TODO 1: question: str을 받아 `await stock_agent.run(user_msg=question)`을 호출하고
-    #         str(response)를 반환하는 비동기 함수 작성
     async def ask_stock_agent(question: str) -> str:
-        ...  # <- 여기를 채우세요
+        response = await stock_agent.run(user_msg=question)
+        return str(response)
 
     def sync_placeholder(question: str) -> str:
         raise NotImplementedError("동기 호출은 지원하지 않습니다 (async_fn만 사용)")
 
-    # TODO 2: FunctionTool.from_defaults(fn=sync_placeholder, async_fn=ask_stock_agent,
-    #         name="stock_price", description="...")로 도구화
-    return None  # <- 여기를 채우세요
+    return FunctionTool.from_defaults(
+        fn=sync_placeholder,
+        async_fn=ask_stock_agent,
+        name="stock_price",
+        description="주식 티커의 현재가를 조회한다.",
+    )
 
 
 async def main():
@@ -103,26 +105,35 @@ async def main():
     Settings.embed_model = get_embed_model()
     Settings.transformations = [SentenceSplitter(chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP)]
 
-    sub_question_engine = build_sub_question_engine(llm)
-    stock_agent = build_stock_agent(llm)
+    document_qa_tool = build_document_qa_tool(llm)
+    stock_price_tool = build_stock_price_tool(llm)
 
-    # TODO 3: sub_question_engine을 QueryEngineTool.from_defaults(query_engine=..., name="document_qa", description="...")로 감싸기
-    document_qa_tool = None  # <- 여기를 채우세요
+    top_agent = FunctionAgent(
+        tools=[document_qa_tool, stock_price_tool],
+        llm=llm,
+        verbose=True,
+    )
 
-    # TODO 4: make_stock_agent_tool(stock_agent) 호출
-    stock_price_tool = None  # <- 여기를 채우세요
+    # 이 ctx를 계속 재사용하면 대화가 이어집니다 (REPL 전체에서 하나만 생성)
+    ctx = Context(top_agent)
 
-    # TODO 5: 위 두 도구를 가진 최상위 FunctionAgent(tools=[...], llm=llm, verbose=True) 생성
-    top_agent = None  # <- 여기를 채우세요
+    print("미니 sec-insights 에이전트입니다. 'exit' 입력 시 종료.")
+    print("예: 'Uber의 2021년 주요 리스크 요인이 뭐야?' / 'UBER 주가는 얼마야?' / '그럼 LYFT는?'\n")
 
-    print("=" * 20, "문서 질문", "=" * 20)
-    print(await top_agent.run(user_msg="Uber의 2021년 주요 리스크 요인은 뭐야?"))
+    while True:
+        question = input("질문> ").strip()
+        if question.lower() in ("exit", "quit"):
+            break
+        if not question:
+            continue
 
-    print("\n" + "=" * 20, "주가 질문", "=" * 20)
-    print(await top_agent.run(user_msg="UBER 주가 알려줘"))
-
-    print("\n" + "=" * 20, "복합 질문", "=" * 20)
-    print(await top_agent.run(user_msg="Uber 리스크 요인 알려주고 UBER 주가도 알려줘"))
+        # 무료 NIM 엔드포인트는 스트리밍 도중 가끔 502/Internal server error를 던집니다.
+        # 한 턴이 실패해도 REPL 전체가 죽지 않도록 감싸줍니다 (같은 ctx라 다음 질문에서 이어서 시도 가능).
+        try:
+            response = await top_agent.run(user_msg=question, ctx=ctx)
+            print(f"\n답변> {response}\n")
+        except Exception as e:
+            print(f"\n[일시적 오류] {type(e).__name__}: {e}\n다시 질문해보세요.\n")
 
 
 if __name__ == "__main__":

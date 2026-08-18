@@ -72,7 +72,7 @@ python starter.py
       - **최종 종합(response_synthesizer)** — 가장 중요한 단계라 비싼/고성능 모델을 여기만 쓰는 경우가 많음 (`get_response_synthesizer(llm=big_llm)`)
       
       즉 "전부 비싼 모델 하나로 통일"은 우리가 선택한 결과지, LlamaIndex나 OpenAI가 강제하는 정책이 아닙니다.
-다음: `study/stage6_function_tool`
+다음: `study/stage6_mini_agent`
 
 
 ## 질문
